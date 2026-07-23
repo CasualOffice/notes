@@ -132,6 +132,18 @@ cd ui && pnpm install && pnpm build && cd ..
 cargo tauri dev
 ```
 
+**Before pushing** (and before tagging a release), run the full CI pipeline locally — it mirrors GitHub CI exactly, including the pinned supply-chain audit:
+
+```bash
+./scripts/ci-local.sh
+```
+
+Releases (signed installers for macOS, Windows, and Linux) are built by CI **only when a version tag is pushed** — never on a merge to `main`:
+
+```bash
+git tag v0.1.0 && git push origin v0.1.0
+```
+
 ## Documentation
 
 The canonical design set lives in [`docs/`](./docs) (start with the [index](./docs/README.md)). All documents are

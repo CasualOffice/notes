@@ -23,7 +23,7 @@ cd ui && pnpm install
 
 ## The bar for a change
 
-A change is "done" only when all of these pass:
+A change is "done" only when all of these pass. Run them all at once with **`./scripts/ci-local.sh`**, which mirrors GitHub CI exactly (same jobs, same pinned `cargo-deny`) — run it before every push and before tagging a release:
 
 ```bash
 cargo fmt --all -- --check

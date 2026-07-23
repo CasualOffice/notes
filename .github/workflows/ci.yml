@@ -102,10 +102,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: cargo-deny (advisories, bans, licenses, sources)
-        uses: EmbarkStudios/cargo-deny-action@v2
+      # Pin cargo-deny to the same version scripts/ci-local.sh uses, so a green
+      # local run guarantees a green CI run. (The generic action bundles an older
+      # cargo-deny that does not understand our deny.toml `unmaintained` field.)
+      - uses: taiki-e/install-action@v2
         with:
-          command: check advisories bans licenses sources
+          tool: cargo-deny@0.20.2
+      - run: cargo deny check advisories bans licenses sources
 
   # Guards the core promise: the shipped source must contain no telemetry.
   no-telemetry:
