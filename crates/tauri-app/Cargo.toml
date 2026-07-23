@@ -1,0 +1,39 @@
+[package]
+name = "tauri-app"
+description = "The Tauri host: command router, event bus, windows/tray/activation, and capability files."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+default-run = "casualnote"
+
+# Library holds the app wiring so both the binary and integration tests can use it.
+[lib]
+name = "tauri_app"
+path = "src/lib.rs"
+
+# The shipped desktop binary.
+[[bin]]
+name = "casualnote"
+path = "src/main.rs"
+
+# NOTE: this is the ONLY crate that depends on `tauri` and exposes
+# `#[tauri::command]`. It is excluded from the core CI job because the GUI build
+# needs webkit2gtk-4.1 (+ libsoup) on Linux. See .github/workflows/ci.yml.
+[dependencies]
+app-domain = { workspace = true }
+app-service = { workspace = true }
+# Store construction + key custody live in `storage`; the host wires them into
+# `app-service::Service` at boot (the WebView never touches either).
+storage = { workspace = true }
+tauri = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[build-dependencies]
+tauri-build = { workspace = true }

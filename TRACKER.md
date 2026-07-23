@@ -4,7 +4,7 @@ Live build status. **Checked the moment a unit is complete _and_ verified.** Leg
 `[x]` done · `[!]` blocked. Milestones (M0–M8) and workstreams (W1–W12) reference
 [`docs/casual-note-roadmap.md`](./docs/casual-note-roadmap.md).
 
-_Last updated: 2026-07-23 — Phase 0 (governance + scaffold) underway._
+_Last updated: 2026-07-23 — Phase 1 scaffold complete: 26 crates + UI scaffold; foundation crates compile clean with green `cargo test`, `clippy -D warnings`, `fmt`, and frontend `typecheck`/`lint`/`test`/`build`._
 
 ---
 
@@ -31,48 +31,49 @@ _Last updated: 2026-07-23 — Phase 0 (governance + scaffold) underway._
 ## Phase 1 — Core Notebook, Planning & Local Store  → ship v0.1
 
 ### Scaffold (walking skeleton spine)
-- [ ] Cargo workspace root (`Cargo.toml` with all members + shared workspace deps)
-- [ ] `rust-toolchain.toml`, `rustfmt.toml`, `clippy`/`.editorconfig`, CI stub (`.github/workflows`)
-- [ ] All crate directories created with `Cargo.toml` + `//!`-documented `lib.rs` stubs
-- [ ] `ui/` frontend scaffold (Vite + React + TS strict + Tiptap dep + feature-module folders)
-- [ ] `tauri-app` crate: `tauri.conf.json`, `main.rs`, `build.rs`, deny-by-default capabilities
-- [ ] Workspace parses (`cargo metadata`) and core crates `cargo check` clean
+- [x] Cargo workspace root (`Cargo.toml` with all 26 members + shared workspace deps; license Apache-2.0)
+- [x] `rust-toolchain.toml`, `rustfmt.toml`, `.editorconfig`, CI (`.github/workflows`), `deny.toml`
+- [x] All 26 crate directories with `Cargo.toml` + `//!`-documented `lib.rs` (Phase-1 crates implemented; later-phase stubbed)
+- [x] `ui/` frontend scaffold (Vite + React + TS strict + Tiptap + feature-module folders) — typecheck/lint/test/build green
+- [x] `tauri-app` crate: `tauri.conf.json`, `main.rs`, `build.rs`, deny-by-default capabilities
+- [x] Workspace `cargo check --workspace --exclude tauri-app` + `clippy -D warnings` + `fmt` + full `cargo test` **green**
 
 ### W1 — Foundation & Store (`storage`, `app-domain`, `sync-core` dormant)
-- [ ] `app-domain`: UUIDv7/ULID IDs, HLC clock, entity kinds, enums, error taxonomy, `AppEvent`
-- [ ] `storage`: `rusqlite` + SQLCipher (`bundled-sqlcipher-vendored-openssl`); open/keyed connection; OS keystore key mgmt
-- [ ] Migrations: universal `entity` spine + per-type detail tables + polymorphic `link` table (per Data Model)
-- [ ] `entity_op` append-only op-log (UUIDv7/ULID + HLC) + NDJSON entity-mutation journal
-- [ ] Single logical DB writer (WAL, busy_timeout/retry); content-addressed blob store
-- [ ] **Rebuild-from-log oracle**: derived tables reproduce bit-identically from `entity_op` (CI test)
+- [x] `app-domain`: UUIDv7/ULID IDs, HLC clock, entity kinds, enums, error taxonomy, `AppEvent`
+- [x] `storage`: `rusqlite` + SQLCipher (`bundled-sqlcipher-vendored-openssl`); open/keyed connection; OS keystore key mgmt
+- [x] Migrations: universal `entity` spine + per-type detail tables + polymorphic `link` table (per Data Model)
+- [x] `entity_op` append-only op-log (UUIDv7/ULID + HLC) + NDJSON entity-mutation journal
+- [x] Single logical DB writer (WAL, busy_timeout/retry, delta-safe detail upsert); content-addressed blob store
+- [x] **Rebuild-from-log oracle**: derived tables reproduce bit-identically from `entity_op` (test passes)
 
 ### W2 — Editor & Notes (`notes`, `ui/editor`, `ui/notebooks`, `ui/daily`)
-- [ ] `notes`: Tiptap `doc_json` parse + schema validation before persist
-- [ ] Block-index projection + link extraction (`[[wiki]]` / `#tag` / `@mention`) → blocks/links tables
-- [ ] Markdown import/export round-trip
-- [ ] UI: Tiptap editor with `blockId`-stamped custom nodes (todo, callout, code, table, wikilink, tag, mention)
+- [x] `notes`: Tiptap `doc_json` parse + schema validation before persist
+- [x] Block-index projection + link extraction (`[[wiki]]` / `#tag` / `@mention`) → blocks/links tables
+- [x] Markdown import/export round-trip
+- [~] UI: Tiptap editor with `blockId`-stamped nodes _(minimal editor wired; full custom-node set pending)_
 - [ ] UI: notebooks/folder tree; daily-note spine keyed by `daily_date`
 - [ ] UI: quick-capture frameless panel + global hotkey
 
 ### W3 — Tasks / Reminders / Scheduler (`tasks`, `reminders`, `scheduler`, `links`, `ui/tasks`)
-- [ ] `tasks`: areas/projects/headings/tasks/checklists; `start_on`/`deadline_on` split
-- [ ] Derived Today / Upcoming / Anytime / Someday buckets (query-equivalence tested)
-- [ ] Fractional-index drag-reorder (stable under churn)
-- [ ] `reminders`: first-class polymorphic reminders + reminder state machine
-- [ ] Recurrence via `rrule` (`every` / `every!`, materialize-on-completion)
-- [ ] `scheduler`: Layer A Tokio timer-wheel (min-heap on `fire_at`), rebuilt from SQLite on boot
-- [ ] `scheduler`: Layer B OS one-shot handoff (macOS/Windows), honest `RunningOnly` on Linux
-- [ ] Missed-reminder catch-up sweep on launch/wake; de-dup (no double-fire, no drop)
+- [x] `tasks`: areas/projects/headings/tasks/checklists; `start_on`/`deadline_on` split
+- [x] Derived Today / Upcoming / Anytime / Someday buckets (query-equivalence tested)
+- [x] Fractional-index drag-reorder (stable under churn)
+- [x] `reminders`: first-class polymorphic reminders + reminder state machine
+- [x] Recurrence via `rrule` (`every` / `every!`, materialize-on-completion)
+- [x] `scheduler`: Layer A Tokio timer-wheel (min-heap on `fire_at`), rebuilt from SQLite on boot
+- [~] `scheduler`: Layer B OS one-shot handoff — Linux honest `RunningOnly` done; macOS/Windows adapters stubbed
+- [x] Missed-reminder catch-up sweep on launch/wake; de-dup (no double-fire, no drop)
 
 ### W4 — NL Entry (`app-nlp`)
-- [ ] Grammar/regex fast path → `ParsedEntry` (route note|task|reminder + date/recurrence)
-- [ ] Live highlighting in quick-capture (LLM fallback deferred to Phase 2)
+- [x] Grammar/regex fast path → `ParsedEntry` (route note|task|reminder + date/recurrence); never invents a date
+- [~] Live highlighting in quick-capture _(highlight spans produced; UI wiring pending)_ — LLM fallback deferred to Phase 2
 
 ### W8 (P1 slice) — Search (`search`, `ui/command-palette`, `ui/search`)
-- [ ] FTS5/BM25 over the entity spine (contentless FTS + rowid↔entity map)
-- [ ] Command palette **Go** + **Do** modes
+- [x] FTS5/BM25 over the entity spine (contentless FTS + rowid↔entity map)
+- [~] Command palette **Go** + **Do** modes _(query models + Do registry done; UI pending)_
 
 ### Milestone gates
+_Foundation crates are implemented and unit-tested; the gates below require the assembled desktop app. **M0 (walking skeleton) is the next integration step** — it needs the Tauri shell to build (Linux GUI system libs) and app-service↔tauri-app↔UI wired end to end._
 - [ ] **M0** Walking skeleton: store opens (SQLCipher, key in keystore); create note; op appended; rebuild from log; 2 windows + tray; launch < 2 s; no plaintext on disk
 - [ ] **M1** Notebook usable: editor + projection + wikilinks/backlinks; notebooks; daily; quick-capture; MD round-trip; keystroke never lost on kill; save→projection < 50 ms p95
 - [ ] **M2** Plan & remind: buckets; start/deadline; reorder; recurrence; reminders fire via both layers; catch-up; ±1 s fire; 0 missed in 1000-reminder soak

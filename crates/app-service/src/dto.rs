@@ -1,0 +1,194 @@
+//! Command request/response DTOs — the typed wire shapes the WebView exchanges
+//! with the Rust core (HLD §6). These are `app-service`-owned because app-domain is
+//! the dependency-light vocabulary and deliberately carries no command payloads;
+//! all ids cross the boundary as hyphenated-UUID strings.
+
+use app_domain::EntityRef;
+use app_nlp::ParsedEntry;
+use serde::{Deserialize, Serialize};
+
+// ---------------------------------------------------------------------------
+// Notes & blocks
+// ---------------------------------------------------------------------------
+
+/// `notes.get` result: the source-of-truth `doc_json` plus spine/detail meta.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct NoteView {
+    pub id: String,
+    pub title: Option<String>,
+    pub doc_json: String,
+    pub notebook_id: Option<String>,
+    pub daily_date: Option<String>,
+    pub is_pinned: bool,
+    /// Optimistic-concurrency token (== `entity.updated_at` ms).
+    pub version: i64,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+/// `notes.save` result (HLD §6).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SaveResult {
+    /// New optimistic-concurrency token.
+    pub version: i64,
+    pub changed_block_ids: Vec<String>,
+}
+
+/// `notes.list` element.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct NoteSummary {
+    pub id: String,
+    pub title: Option<String>,
+    pub daily_date: Option<String>,
+    pub is_pinned: bool,
+    pub updated_at: i64,
+}
+
+/// `blocks.get` result (Data Model §4.2 projected block).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct BlockView {
+    pub block_id: String,
+    pub note_id: String,
+    pub node_type: String,
+    pub seq: i64,
+    pub depth: i64,
+    pub text_content: Option<String>,
+    pub order_key: String,
+}
+
+/// `blocks.backlinks` element (derived-on-read from `links`).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct BacklinkView {
+    pub src_entity: String,
+    pub src_kind: String,
+    pub src_title: Option<String>,
+    pub src_block_id: Option<String>,
+    pub rel: String,
+}
+
+/// `notes.resolveLinks` element: a wikilink target and how it resolved.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct LinkResolution {
+    pub target_title: String,
+    pub rel: String,
+    pub resolved_id: Option<String>,
+    /// True when a stub note was created for an unresolved `[[X]]` (HLD §8.1).
+    pub created_stub: bool,
+}
+
+// ---------------------------------------------------------------------------
+// Tasks / projects / areas
+// ---------------------------------------------------------------------------
+
+/// The task detail + spine projection returned by the task commands.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct TaskView {
+    pub id: String,
+    pub title: Option<String>,
+    pub project_id: Option<String>,
+    pub area_id: Option<String>,
+    pub notes_md: Option<String>,
+    pub status: String,
+    pub priority: i64,
+    pub someday: bool,
+    pub start_on: Option<String>,
+    pub deadline_on: Option<String>,
+    pub completed_at: Option<i64>,
+    pub order_key: String,
+}
+
+/// `tasks.create` input.
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct NewTask {
+    pub title: String,
+    pub project_id: Option<String>,
+    pub area_id: Option<String>,
+    pub notes_md: Option<String>,
+    pub start_on: Option<String>,
+    pub deadline_on: Option<String>,
+    pub someday: Option<bool>,
+    pub priority: Option<i64>,
+}
+
+/// `tasks.update` patch — every field optional (per-field LWW at the writer).
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct TaskPatch {
+    pub title: Option<String>,
+    pub notes_md: Option<String>,
+    pub status: Option<String>,
+    pub priority: Option<i64>,
+    pub someday: Option<bool>,
+    pub start_on: Option<String>,
+    pub deadline_on: Option<String>,
+    pub project_id: Option<String>,
+    pub area_id: Option<String>,
+}
+
+// ---------------------------------------------------------------------------
+// Reminders
+// ---------------------------------------------------------------------------
+
+/// A `reminder` row projection returned by the reminder commands.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ReminderView {
+    pub id: String,
+    pub target_kind: Option<String>,
+    pub target_id: Option<String>,
+    pub fire_at: i64,
+    pub tz: String,
+    pub state: String,
+    pub snoozed_until: Option<i64>,
+    pub body: Option<String>,
+}
+
+/// `reminders.create` input.
+#[derive(Clone, Debug, Deserialize)]
+pub struct NewReminder {
+    /// Target entity ref (`{kind, id}`); omitted for a standalone reminder.
+    pub target: Option<EntityRef>,
+    pub fire_at: i64,
+    pub tz: String,
+    pub body: Option<String>,
+}
+
+/// A scheduling descriptor the host lifts into `scheduler::ScheduledReminder` to
+/// arm Layer A (kept scheduler-free so app-service doesn't depend on `scheduler`).
+#[derive(Clone, Debug)]
+pub struct ScheduleRequest {
+    pub reminder_id: String,
+    pub fire_at: i64,
+    pub tz: String,
+    pub body: Option<String>,
+    pub target: Option<EntityRef>,
+    /// Whether the platform has an OS one-shot layer (false on Linux — HLD §9.3).
+    pub os_layer: bool,
+}
+
+// ---------------------------------------------------------------------------
+// Quick capture & search
+// ---------------------------------------------------------------------------
+
+/// `capture.quick` result (HLD §6): what got written + the parse that routed it.
+#[derive(Clone, Debug, Serialize)]
+pub struct CaptureResult {
+    pub entity_ref: EntityRef,
+    pub parsed: ParsedEntry,
+}
+
+/// One `search.query` hit (a flattened, WebView-friendly `SearchHit`).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SearchHitDto {
+    pub kind: String,
+    pub id: String,
+    pub title: Option<String>,
+    pub snippet: String,
+    pub bm25: f64,
+}
+
+/// `search.query` result envelope.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SearchResultsDto {
+    pub query_id: String,
+    pub hits: Vec<SearchHitDto>,
+    pub complete: bool,
+}

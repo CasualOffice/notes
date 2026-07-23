@@ -1,0 +1,20 @@
+[package]
+name = "scheduler"
+description = "Dual-layer notifier: Tokio timer-wheel + OS one-shot handoff + catch-up sweep."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+app-domain = { workspace = true }
+reminders = { path = "../reminders" }
+serde = { workspace = true }
+tokio = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }

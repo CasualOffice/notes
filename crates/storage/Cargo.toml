@@ -1,0 +1,40 @@
+[package]
+name = "storage"
+description = "SQLCipher store, NDJSON journals, and content-addressed blobs (direct rusqlite, never tauri-plugin-sql)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[features]
+# `os-keystore` pulls the platform-native OS keystore backend via `keyring`.
+# It is on by default; disabling it leaves only the file-backed dev fallback,
+# which is useful for headless CI where no Secret Service / Keychain exists.
+default = ["os-keystore"]
+os-keystore = ["dep:keyring"]
+
+[dependencies]
+app-domain = { workspace = true }
+rusqlite = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+chrono = { workspace = true }
+
+# Content-addressed blob store (SHA-256 filenames) + CSPRNG for the DB key.
+sha2 = "0.10"
+getrandom = "0.2"
+
+# OS keystore (optional). Per-target backends keep the dependency pure-Rust on
+# Linux (zbus + rustcrypto, no system libdbus / no network) and native elsewhere.
+[target.'cfg(target_os = "linux")'.dependencies]
+keyring = { version = "3", default-features = false, features = ["sync-secret-service", "crypto-rust"], optional = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "3", default-features = false, features = ["apple-native"], optional = true }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+keyring = { version = "3", default-features = false, features = ["windows-native"], optional = true }

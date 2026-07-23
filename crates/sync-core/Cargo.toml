@@ -1,0 +1,12 @@
+[package]
+name = "sync-core"
+description = "STUB (DORMANT): op-log/HLC/UUID substrate + projection seam (inert in v1)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+

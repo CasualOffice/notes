@@ -1,0 +1,70 @@
+[workspace]
+resolver = "2"
+members = ["crates/*"]
+
+# ---------------------------------------------------------------------------
+# Shared package metadata inherited by every member via `<field>.workspace = true`
+# ---------------------------------------------------------------------------
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+authors = ["Casual Note contributors"]
+repository = "https://github.com/CasualOffice/notes"
+rust-version = "1.94"
+
+# ---------------------------------------------------------------------------
+# Shared, pinned dependency versions. Member crates opt in with
+# `<dep> = { workspace = true }` and may add extra features locally.
+# Rationale on datetime choice: the `rrule` crate depends on `chrono`, so to
+# avoid dragging two datetime stacks into the tree the whole workspace
+# standardizes on `chrono` (NOT `time`). See app-domain::time.
+# ---------------------------------------------------------------------------
+[workspace.dependencies]
+# --- internal crates (path deps; referenced as `{ workspace = true }`) ---
+app-domain  = { path = "crates/app-domain" }
+app-service = { path = "crates/app-service" }
+storage     = { path = "crates/storage" }
+
+# --- serialization ---
+serde      = { version = "1.0.217", features = ["derive"] }
+serde_json = "1.0.138"
+
+# --- async runtime ---
+tokio = { version = "1.43.0", features = ["rt-multi-thread", "macros", "sync", "time"] }
+
+# --- storage: direct rusqlite + SQLCipher, compiled from source, no system libs ---
+rusqlite = { version = "0.32.1", features = ["bundled-sqlcipher-vendored-openssl"] }
+
+# --- identifiers (UUIDv7 for entities, ULID for op-log) ---
+uuid = { version = "1.12.1", features = ["v7", "serde"] }
+ulid = { version = "1.1.4", features = ["serde"] }
+
+# --- errors ---
+thiserror = "2.0.11"
+anyhow    = "1.0.95"
+
+# --- tracing / observability (local only, never network-shipped) ---
+tracing            = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+
+# --- time & recurrence (chrono is the workspace-wide datetime stack) ---
+chrono = { version = "0.4.39", features = ["serde"] }
+rrule  = "0.13.0"
+
+# --- text / parsing ---
+regex     = "1.11.1"
+once_cell = "1.20.2"
+
+# --- desktop shell (only tauri-app depends on these) ---
+tauri = { version = "2.2.5", features = [] }
+tauri-build = { version = "2.0.5", features = [] }
+
+# ---------------------------------------------------------------------------
+# Release profile: source-compiled SQLCipher/OpenSSL benefit from LTO.
+# ---------------------------------------------------------------------------
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true

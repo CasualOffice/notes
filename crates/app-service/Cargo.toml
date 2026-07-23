@@ -1,0 +1,33 @@
+[package]
+name = "app-service"
+description = "Orchestration facade: transactions, cross-crate workflows, AppEvent emission."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+app-domain = { workspace = true }
+storage = { workspace = true }
+# Feature crates composed by the orchestration workflows (HLD §4/§6). These are
+# path deps because only app-domain/app-service/storage sit in
+# [workspace.dependencies]; the rest are addressed by path.
+notes = { path = "../notes" }
+links = { path = "../links" }
+tasks = { path = "../tasks" }
+reminders = { path = "../reminders" }
+search = { path = "../search" }
+app-nlp = { path = "../app-nlp" }
+# Direct rusqlite (SQLCipher) — app-service executes the SQL that `links`/`tasks`/
+# `search` build against the single `storage` writer/read connection. It never
+# hands SQL to the WebView (CLAUDE.md invariant).
+rusqlite = { workspace = true }
+tokio = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+sha2 = "0.10.8"

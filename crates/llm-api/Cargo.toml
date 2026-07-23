@@ -1,0 +1,12 @@
+[package]
+name = "llm-api"
+description = "STUB (later phase): LLM trait; GBNF-constrained structured output; repair→fallback."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+

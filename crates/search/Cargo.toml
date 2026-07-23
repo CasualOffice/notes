@@ -1,0 +1,23 @@
+[package]
+name = "search"
+description = "FTS5(BM25) ∪ sqlite-vec KNN, RRF fusion, filter compilation."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+# Phase-1 slice: pure query construction. The search crate NEVER opens a DB
+# connection — it emits parameterized SQL that `storage` executes (CLAUDE.md:
+# "the WebView never sees SQL; all DB access is Rust-side via storage"). Hence
+# `rusqlite` is a *dev*-dependency only, used to exercise the generated SQL
+# against an in-memory FTS5 store in unit tests.
+[dependencies]
+app-domain = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+rusqlite = { workspace = true }

@@ -1,0 +1,17 @@
+[package]
+name = "reminders"
+description = "Reminder entity + state machine; rrule recurrence advance (materialize-on-completion)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+app-domain = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+rrule = { workspace = true }

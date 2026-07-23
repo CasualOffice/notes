@@ -1,0 +1,4 @@
+# rustfmt defaults, pinned explicitly for reproducibility.
+edition = "2021"
+max_width = 100
+newline_style = "Unix"

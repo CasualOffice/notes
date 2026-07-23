@@ -1,0 +1,22 @@
+[package]
+name = "app-domain"
+description = "Shared domain types for Casual Note: IDs, HLC, entity kinds, error taxonomy, and the AppEvent model."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "app_domain"
+
+# Dependency-light by design (HLD §5, Architecture §13.1): shared types only,
+# no DB, no IO, no async. Implements Data Model §1/§3 and HLD §7.
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+ulid = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }

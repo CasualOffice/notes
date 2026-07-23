@@ -1,0 +1,12 @@
+[package]
+name = "ai-workspace"
+description = "STUB (later phase): retrieve→RRF→rerank→grounded-decode(AnswerV1)→citation-verify."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+

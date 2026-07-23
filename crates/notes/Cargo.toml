@@ -1,0 +1,17 @@
+[package]
+name = "notes"
+description = "Tiptap doc_json parsing, block-index projection, [[wiki]]/#tag/@mention extraction, Markdown i/o."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+app-domain = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+regex = { workspace = true }
+once_cell = { workspace = true }

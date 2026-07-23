@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main-window",
+  "description": "Deny-by-default baseline for the main window: only core essentials are granted — command invocation and the event channel the WebView listens on for AppEvents (HLD §7). Feature permissions (scoped fs to attachments, notification, global-shortcut, deep-link) are added explicitly as the corresponding HLD §6 commands land — never broadly. See Architecture §9/§12.",
+  "local": true,
+  "windows": ["main"],
+  "permissions": ["core:default", "core:event:default"]
+}

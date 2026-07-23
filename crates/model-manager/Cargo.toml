@@ -1,0 +1,12 @@
+[package]
+name = "model-manager"
+description = "STUB (later phase): signed manifests, SHA-256, resumable download, offline import."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+
