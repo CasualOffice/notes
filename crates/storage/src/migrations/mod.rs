@@ -22,11 +22,18 @@ struct Migration {
 }
 
 /// The ordered migration set. Append new entries; never edit a released one.
-const MIGRATIONS: &[Migration] = &[Migration {
-    version: 1,
-    name: "initial",
-    sql: include_str!("V001__initial.sql"),
-}];
+const MIGRATIONS: &[Migration] = &[
+    Migration {
+        version: 1,
+        name: "initial",
+        sql: include_str!("V001__initial.sql"),
+    },
+    Migration {
+        version: 2,
+        name: "meeting",
+        sql: include_str!("V002__meeting.sql"),
+    },
+];
 
 /// The highest schema version this binary understands.
 #[must_use]

@@ -39,6 +39,7 @@ pub fn reproject_all_fts(tx: &Transaction<'_>) -> StorageResult<()> {
 
     reproject_fts_note(tx)?;
     reproject_fts_task(tx)?;
+    reproject_fts_transcript(tx)?;
     Ok(())
 }
 
@@ -99,6 +100,40 @@ fn reproject_fts_task(tx: &Transaction<'_>) -> StorageResult<()> {
         tx.execute(
             "INSERT INTO fts_task(rowid, title, notes_md) VALUES(?1, ?2, ?3)",
             params![rowid, title, notes_md],
+        )?;
+    }
+    Ok(())
+}
+
+/// Reproject `fts_transcript` from the authoritative `transcript_segment` rows.
+///
+/// Only `pass='final'` segments are indexed — the authoritative citation target
+/// (Data Model §8.3: live rows are superseded by final). Rows are ordered by
+/// segment `id` so rowids are assigned deterministically across rebuilds; the map
+/// resolves an FTS rowid back to the `transcript_segment.id` (its `segment_id`,
+/// the evidence anchor). Segments of soft-deleted sessions are excluded.
+fn reproject_fts_transcript(tx: &Transaction<'_>) -> StorageResult<()> {
+    let segs: Vec<(Vec<u8>, String)> = {
+        let mut stmt = tx.prepare(
+            "SELECT ts.id, ts.text
+             FROM transcript_segment ts
+             JOIN entity e ON e.id = ts.session_id
+             WHERE ts.pass = 'final' AND e.deleted_at IS NULL
+             ORDER BY ts.id",
+        )?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        rows.collect::<Result<_, _>>()?
+    };
+
+    for (i, (seg_id, text)) in segs.iter().enumerate() {
+        let rowid = i as i64 + 1;
+        tx.execute(
+            "INSERT INTO fts_transcript_map(rowid, segment_id) VALUES(?1, ?2)",
+            params![rowid, seg_id],
+        )?;
+        tx.execute(
+            "INSERT INTO fts_transcript(rowid, text) VALUES(?1, ?2)",
+            params![rowid, text],
         )?;
     }
     Ok(())

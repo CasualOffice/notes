@@ -21,6 +21,14 @@ tasks = { path = "../tasks" }
 reminders = { path = "../reminders" }
 search = { path = "../search" }
 app-nlp = { path = "../app-nlp" }
+# Phase-2 engine contracts (traits + DTOs) + the pure DSP pipeline. The session
+# coordinator composes these behind their trait seams; the real whisper.cpp /
+# llama.cpp / OS-capture backends plug into the same traits in a later pass.
+capture-api = { path = "../capture-api" }
+speech-api = { path = "../speech-api" }
+llm-api = { path = "../llm-api" }
+media-pipeline = { path = "../media-pipeline" }
+async-trait = "0.1"
 # Direct rusqlite (SQLCipher) — app-service executes the SQL that `links`/`tasks`/
 # `search` build against the single `storage` writer/read connection. It never
 # hands SQL to the WebView (CLAUDE.md invariant).

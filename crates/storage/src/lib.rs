@@ -50,8 +50,8 @@ pub use journal::{OpJournal, OpRecord};
 pub use keystore::{DevFileKeyStore, KeyStore};
 pub use layout::Paths;
 pub use oplog::{
-    append_op, apply_op, BlockRow, DetailFields, DetailTable, EntityOp, LinkRow, OpBody, OpKind,
-    SpineFields,
+    append_op, apply_op, AudioTrackRow, BlockRow, DetailFields, DetailTable, EntityOp, LinkRow,
+    OpBody, OpKind, SpineFields, TranscriptSegmentRow,
 };
 pub use rebuild::{rebuild_from_log, reproject_all_fts};
 

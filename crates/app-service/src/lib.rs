@@ -24,9 +24,18 @@ pub mod notebooks;
 pub mod notes;
 pub mod reminders;
 pub mod search;
+pub mod session;
 pub mod stubs;
 pub mod tasks;
 pub mod util;
+
+/// The M2 meeting-intelligence surface: the session state machine + coordinator
+/// (`session`), re-exported so `tauri-app` can name them without a second import.
+pub use session::{
+    legal_transition, ActionItemOverrides, ActionItemView, AudioSource, CannedAudioSource,
+    CaptureBlock, MeetingConfig, MockCaptureAdapter, PreflightReport, SessionCoordinator,
+    SessionOutcome, SessionView,
+};
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;

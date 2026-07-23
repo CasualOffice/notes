@@ -99,6 +99,9 @@ pub enum DetailTable {
     Reminder,
     RecurrenceRule,
     Person,
+    Session,
+    Artifact,
+    ActionItem,
 }
 
 impl DetailTable {
@@ -113,6 +116,9 @@ impl DetailTable {
             Self::Reminder => "reminder",
             Self::RecurrenceRule => "recurrence_rule",
             Self::Person => "person",
+            Self::Session => "session",
+            Self::Artifact => "artifact",
+            Self::ActionItem => "action_item",
         }
     }
 
@@ -180,6 +186,38 @@ impl DetailTable {
                 "complete_instances",
             ],
             Self::Person => &["display", "canonical", "aliases", "email", "avatar_sha256"],
+            Self::Session => &[
+                "state",
+                "note_id",
+                "started_at",
+                "ended_at",
+                "duration_ms",
+                "capture_source",
+                "platform",
+                "degraded_reason",
+                "journal_path",
+            ],
+            Self::Artifact => &[
+                "session_id",
+                "schema_version",
+                "generation",
+                "is_current",
+                "llm_model",
+                "artifact_json",
+                "generated_at",
+            ],
+            Self::ActionItem => &[
+                "artifact_id",
+                "session_id",
+                "idx",
+                "task_text",
+                "owner_person_id",
+                "owner_text",
+                "due_date",
+                "evidence_segment_ids",
+                "promoted_task_id",
+                "status",
+            ],
         }
     }
 
@@ -199,6 +237,14 @@ impl DetailTable {
             ],
             Self::Project => &["area_id", "note_id"],
             Self::Reminder => &["target_id", "recurrence_id"],
+            Self::Session => &["note_id"],
+            Self::Artifact => &["session_id"],
+            Self::ActionItem => &[
+                "artifact_id",
+                "session_id",
+                "owner_person_id",
+                "promoted_task_id",
+            ],
             _ => &[],
         }
     }
@@ -246,6 +292,46 @@ fn default_origin() -> String {
     "user".to_string()
 }
 
+/// An `audio_track` row (Data Model §8.2). Not a spine entity — carried in the
+/// op-log (like `block`/`link`) so a full replay reconstructs it. Raw PCM never
+/// rides here; only the content-addressed `audio_sha256` metadata does (N13).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AudioTrackRow {
+    pub id: Id,
+    pub session_id: Id,
+    pub source_kind: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_label: Option<String>,
+    pub sample_rate: i64,
+    pub channels: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub audio_sha256: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub byte_size: Option<i64>,
+}
+
+/// A `transcript_segment` row (Data Model §8.3) — the atomic unit of evidence.
+/// Not a spine entity; carried in the op-log so a replay reconstructs every
+/// segment an `evidence_segment_ids` reference resolves to.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct TranscriptSegmentRow {
+    pub id: Id,
+    pub session_id: Id,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub track_id: Option<Id>,
+    pub seq: i64,
+    pub t_start_ms: i64,
+    pub t_end_ms: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub speaker: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub person_id: Option<Id>,
+    pub text: String,
+    pub pass: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub confidence: Option<f64>,
+}
+
 /// The payload body persisted in `entity_op.payload` (JSON).
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "body", rename_all = "snake_case")]
@@ -264,6 +350,10 @@ pub enum OpBody {
     LinkSet { link: LinkRow },
     /// Soft-delete a link edge.
     LinkDelete { link_id: Id, at: i64 },
+    /// Upsert an `audio_track` row (Data Model §8.2).
+    AudioTrackSet { track: AudioTrackRow },
+    /// Upsert a `transcript_segment` row (Data Model §8.3).
+    TranscriptSegmentSet { segment: TranscriptSegmentRow },
 }
 
 /// One op-log entry: an `entity_op` row plus its typed body.
@@ -289,6 +379,7 @@ impl EntityOp {
             OpBody::BlockSet { .. } => OpKind::FieldSet,
             OpBody::LinkSet { .. } => OpKind::Link,
             OpBody::LinkDelete { .. } => OpKind::Unlink,
+            OpBody::AudioTrackSet { .. } | OpBody::TranscriptSegmentSet { .. } => OpKind::FieldSet,
         };
         Self {
             op_id: OpId::new(),
@@ -354,6 +445,8 @@ pub fn apply_op(tx: &Transaction<'_>, op: &EntityOp) -> StorageResult<()> {
                 params![link_id.as_bytes().as_slice(), at],
             )?;
         }
+        OpBody::AudioTrackSet { track } => upsert_audio_track(tx, track)?,
+        OpBody::TranscriptSegmentSet { segment } => upsert_transcript_segment(tx, segment)?,
     }
     Ok(())
 }
@@ -559,6 +652,66 @@ fn upsert_link(tx: &Transaction<'_>, l: &LinkRow) -> StorageResult<()> {
             l.origin,
             l.created_at,
             l.hlc,
+        ],
+    )?;
+    Ok(())
+}
+
+fn upsert_audio_track(tx: &Transaction<'_>, t: &AudioTrackRow) -> StorageResult<()> {
+    tx.execute(
+        "INSERT INTO audio_track(id, session_id, source_kind, source_label, sample_rate,
+                                 channels, audio_sha256, byte_size)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+         ON CONFLICT(id) DO UPDATE SET
+            session_id   = excluded.session_id,
+            source_kind  = excluded.source_kind,
+            source_label = excluded.source_label,
+            sample_rate  = excluded.sample_rate,
+            channels     = excluded.channels,
+            audio_sha256 = excluded.audio_sha256,
+            byte_size    = excluded.byte_size",
+        params![
+            t.id.as_bytes().as_slice(),
+            t.session_id.as_bytes().as_slice(),
+            t.source_kind,
+            t.source_label,
+            t.sample_rate,
+            t.channels,
+            t.audio_sha256,
+            t.byte_size,
+        ],
+    )?;
+    Ok(())
+}
+
+fn upsert_transcript_segment(tx: &Transaction<'_>, s: &TranscriptSegmentRow) -> StorageResult<()> {
+    tx.execute(
+        "INSERT INTO transcript_segment(id, session_id, track_id, seq, t_start_ms, t_end_ms,
+                                        speaker, person_id, text, pass, confidence)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+         ON CONFLICT(id) DO UPDATE SET
+            session_id = excluded.session_id,
+            track_id   = excluded.track_id,
+            seq        = excluded.seq,
+            t_start_ms = excluded.t_start_ms,
+            t_end_ms   = excluded.t_end_ms,
+            speaker    = excluded.speaker,
+            person_id  = excluded.person_id,
+            text       = excluded.text,
+            pass       = excluded.pass,
+            confidence = excluded.confidence",
+        params![
+            s.id.as_bytes().as_slice(),
+            s.session_id.as_bytes().as_slice(),
+            s.track_id.map(|t| t.as_bytes().to_vec()),
+            s.seq,
+            s.t_start_ms,
+            s.t_end_ms,
+            s.speaker,
+            s.person_id.map(|p| p.as_bytes().to_vec()),
+            s.text,
+            s.pass,
+            s.confidence,
         ],
     )?;
     Ok(())
