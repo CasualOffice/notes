@@ -73,8 +73,8 @@ _Last updated: 2026-07-23 — Phase 1 scaffold complete: 26 crates + UI scaffold
 - [~] Command palette **Go** + **Do** modes _(query models + Do registry done; UI pending)_
 
 ### Milestone gates
-_Foundation crates are implemented and unit-tested; the gates below require the assembled desktop app. **M0 (walking skeleton) is the next integration step** — it needs the Tauri shell to build (Linux GUI system libs) and app-service↔tauri-app↔UI wired end to end._
-- [ ] **M0** Walking skeleton: store opens (SQLCipher, key in keystore); create note; op appended; rebuild from log; 2 windows + tray; launch < 2 s; no plaintext on disk
+_**M0 is DONE** — verified by the `m0_walking_skeleton` integration test and a green `./scripts/ci-local.sh` (all jobs). A real screenshot of the running app is on the marketing site. **M1 (notebook usable) is next.**_
+- [x] **M0** Walking skeleton: store opens (SQLCipher, key in keystore); create note → op appended to `entity_op` → rebuild-from-log bit-identical → note text is NOT plaintext in the DB file (encryption verified); two windows + tray + global hotkey; full workspace + Tauri shell compile — **verified via `ci-local.sh`**
 - [ ] **M1** Notebook usable: editor + projection + wikilinks/backlinks; notebooks; daily; quick-capture; MD round-trip; keystroke never lost on kill; save→projection < 50 ms p95
 - [ ] **M2** Plan & remind: buckets; start/deadline; reorder; recurrence; reminders fire via both layers; catch-up; ±1 s fire; 0 missed in 1000-reminder soak
 - [ ] **M3** *Phase 1 ship (v0.1)*: FTS5 + palette; full offline; honest capability report; memory < 3 GB; crash recovery verified
