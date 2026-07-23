@@ -1,0 +1,14 @@
+Casual Note
+Copyright 2026 Casual Note contributors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This product bundles or depends on third-party components that carry their own
+licenses, including but not limited to:
+  - whisper.cpp (MIT) — local speech-to-text
+  - llama.cpp (MIT) — local LLM inference
+  - SQLite / SQLCipher — database engine and encryption
+  - Tauri (MIT / Apache-2.0) — desktop application shell
+AI model weights downloaded via the model manager are governed by their
+respective model licenses (e.g. Qwen, Gemma) and are not distributed with this
+source.

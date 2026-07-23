@@ -12,7 +12,7 @@ _Last updated: 2026-07-23 — Phase 0 (governance + scaffold) underway._
 
 - [x] Canonical design docs authored (`docs/`: PRD, Architecture, HLD, Data Model, Feature Specs, Roadmap, Research)
 - [x] Docs consistency audit + index (`docs/README.md`)
-- [x] `LICENSE` (MIT)
+- [x] `LICENSE` (Apache-2.0) + `NOTICE`
 - [x] `README.md` (root)
 - [x] `CONTRIBUTING.md`
 - [x] `CODE_OF_CONDUCT.md`

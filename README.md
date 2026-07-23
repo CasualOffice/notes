@@ -95,5 +95,5 @@ the doc-authority hierarchy, and [SECURITY.md](./SECURITY.md) before touching an
 
 ## License
 
-[MIT](./LICENSE) © 2026 Casual Note contributors. Bundled inference engines (whisper.cpp, llama.cpp) and models carry
-their own licenses.
+[Apache-2.0](./LICENSE) © 2026 Casual Note contributors. Bundled inference engines (whisper.cpp, llama.cpp) and models
+carry their own licenses (see [NOTICE](./NOTICE)).

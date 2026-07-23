@@ -8,7 +8,7 @@ All notable changes to Casual Note are documented here. The format is based on
 
 ### Added
 - Canonical design documentation set in `docs/` (PRD, Architecture, HLD, Data Model, Feature Specs, Roadmap, Research).
-- Project governance: `README`, `LICENSE` (MIT), `CONTRIBUTING`, `CODE_OF_CONDUCT`, `SECURITY`, `CLAUDE.md`,
+- Project governance: `README`, `LICENSE` (Apache-2.0) + `NOTICE`, `CONTRIBUTING`, `CODE_OF_CONDUCT`, `SECURITY`, `CLAUDE.md`,
   `SKILLS.md`, and the implementation `TRACKER.md`.
 - _Phase 1 (Core Notebook) scaffolding in progress — see `TRACKER.md`._
 
