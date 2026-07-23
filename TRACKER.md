@@ -109,7 +109,8 @@ _Foundation crates are implemented and unit-tested; the gates below require the 
 ---
 
 ## Cross-cutting (W12 — continuous)
-- [~] CI: fmt + clippy + test (multi-OS) + supply-chain audit + telemetry-absence scan _(pipeline in place; goes green once the scaffold compiles clean)_
+- [x] CI: fmt + clippy + test + Tauri-shell build + `cargo-deny` audit + telemetry scan — **all verified green locally** (macOS/Windows matrix non-blocking until platform adapters land)
+- [x] Release pipeline: cross-platform installers, **tag-only** (`v*`) — never runs on merges
 - [ ] Packaging: macOS DMG/notarize · Windows MSI Authenticode · Linux AppImage + Flatpak
 - [ ] Accessibility audit (keyboard-only, screen readers, contrast, reduced-motion)
 - [ ] Performance harness on reference tiers (launch/capture/transcript/save/FTS/memory budgets)
