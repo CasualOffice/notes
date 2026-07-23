@@ -4,7 +4,7 @@ Live build status. **Checked the moment a unit is complete _and_ verified.** Leg
 `[x]` done · `[!]` blocked. Milestones (M0–M8) and workstreams (W1–W12) reference
 [`docs/casual-note-roadmap.md`](./docs/casual-note-roadmap.md).
 
-_Last updated: 2026-07-23 — Phase 1 scaffold complete: 26 crates + UI scaffold; foundation crates compile clean with green `cargo test`, `clippy -D warnings`, `fmt`, and frontend `typecheck`/`lint`/`test`/`build`._
+_Last updated: 2026-07-23 — **M0 + M1 complete** (notebook usable) and **Phase-2 engine foundations** landed; full `./scripts/ci-local.sh` green. Next: M2 (meeting session pipeline)._
 
 ---
 
@@ -50,9 +50,9 @@ _Last updated: 2026-07-23 — Phase 1 scaffold complete: 26 crates + UI scaffold
 - [x] `notes`: Tiptap `doc_json` parse + schema validation before persist
 - [x] Block-index projection + link extraction (`[[wiki]]` / `#tag` / `@mention`) → blocks/links tables
 - [x] Markdown import/export round-trip
-- [~] UI: Tiptap editor with `blockId`-stamped nodes _(minimal editor wired; full custom-node set pending)_
-- [ ] UI: notebooks/folder tree; daily-note spine keyed by `daily_date`
-- [ ] UI: quick-capture frameless panel + global hotkey
+- [x] UI: Tiptap editor with `blockId`-stamped custom nodes (todo/callout/code/table/lists) + slash menu; `[[wikilink]]` autocomplete, `#tag`, `@mention`; debounced autosave; backlinks panel
+- [x] UI: notebooks/folder tree; daily-note (`daily.get_or_create`) Today entry
+- [x] UI: quick-capture window view (`capture.quick`) + global hotkey registered
 
 ### W3 — Tasks / Reminders / Scheduler (`tasks`, `reminders`, `scheduler`, `links`, `ui/tasks`)
 - [x] `tasks`: areas/projects/headings/tasks/checklists; `start_on`/`deadline_on` split
@@ -73,21 +73,21 @@ _Last updated: 2026-07-23 — Phase 1 scaffold complete: 26 crates + UI scaffold
 - [~] Command palette **Go** + **Do** modes _(query models + Do registry done; UI pending)_
 
 ### Milestone gates
-_**M0 is DONE** — verified by the `m0_walking_skeleton` integration test and a green `./scripts/ci-local.sh` (all jobs). A real screenshot of the running app is on the marketing site. **M1 (notebook usable) is next.**_
+_**M0 and M1 are DONE**, verified green via `./scripts/ci-local.sh`. Phase-2 engine foundations (capture/speech/llm contracts, media-pipeline DSP, model-manager) also landed. **Next: M2** — wire the session state machine (capture → STT → LLM → MeetingArtifactV1 → action-items-to-tasks)._
 - [x] **M0** Walking skeleton: store opens (SQLCipher, key in keystore); create note → op appended to `entity_op` → rebuild-from-log bit-identical → note text is NOT plaintext in the DB file (encryption verified); two windows + tray + global hotkey; full workspace + Tauri shell compile — **verified via `ci-local.sh`**
-- [ ] **M1** Notebook usable: editor + projection + wikilinks/backlinks; notebooks; daily; quick-capture; MD round-trip; keystroke never lost on kill; save→projection < 50 ms p95
+- [x] **M1** Notebook usable: Tiptap editor (custom nodes + slash menu) + block projection + `[[wikilinks]]`/backlinks; notebooks tree; daily note; quick-capture window; Markdown round-trip; **keystroke-never-lost-on-kill and save→projection p95 < 50 ms encoded as passing tests** — verified via `ci-local.sh`
 - [ ] **M2** Plan & remind: buckets; start/deadline; reorder; recurrence; reminders fire via both layers; catch-up; ±1 s fire; 0 missed in 1000-reminder soak
 - [ ] **M3** *Phase 1 ship (v0.1)*: FTS5 + palette; full offline; honest capability report; memory < 3 GB; crash recovery verified
 
 ---
 
 ## Phase 2 — Meeting Intelligence, Summaries & Text Search  → ship v0.5
-- [ ] W5 Capture: carry forward macOS/Windows/Linux adapters behind unified trait; ring buffers; RT discipline
-- [ ] W6 STT: whisper.cpp two-pass (live base / final small-medium)
-- [ ] W7 LLM & artifacts: llama.cpp/GGUF Qwen3; GBNF-constrained MeetingArtifactV1; repair→fallback; evidence IDs
+- [~] W5 Capture: `capture-api` trait + capability/DTO contracts done; **`media-pipeline` DSP done** (downmix, 16 kHz resample, VAD, chunking, ring buffer — tested); native OS adapters (SCK/WASAPI/PipeWire FFI) pending
+- [~] W6 STT: `speech-api` trait + segment/hypothesis/profile types done; whisper.cpp FFI adapter pending
+- [~] W7 LLM & artifacts: `llm-api` trait + **MeetingArtifactV1 / AnswerV1 types** done; llama.cpp FFI + GBNF-constrained decode + repair→fallback pending
 - [ ] W10 Session state machine `NEW→…→COMPLETE` (+DEGRADED/FAILED/RECOVERING); INDEXING writes spine+FTS
 - [ ] Cross-pillar bridge: action-item → Task (`spawned_from` + evidence); meeting-as-note
-- [ ] W9 Model manager: signed manifests, SHA-256, resumable download, disk preflight, offline import, tier auto-select
+- [x] W9 Model manager: signed manifests, SHA-256 verify, disk preflight, offline import, hardware-tier select (resumable HTTP downloader behind a trait; real network impl deferred)
 - [ ] W4 NL LLM fallback enabled (resident model exists)
 - [ ] **M4** Local capture · **M5** Transcribe & understand · **M6** *Phase 2 ship (v0.5)*
 
