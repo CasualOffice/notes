@@ -1,4 +1,5 @@
 [package]
+publish = false                 # internal workspace crate — never published to crates.io
 name = "reminders"
 description = "Reminder entity + state machine; rrule recurrence advance (materialize-on-completion)."
 version.workspace = true

@@ -1,4 +1,5 @@
 [package]
+publish = false                 # internal workspace crate — never published to crates.io
 name = "capture-api"
 description = "STUB (later phase): unified capture trait + honest per-platform capability report."
 version.workspace = true

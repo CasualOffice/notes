@@ -1,4 +1,5 @@
 [package]
+publish = false                 # internal workspace crate — never published to crates.io
 name = "notes"
 description = "Tiptap doc_json parsing, block-index projection, [[wiki]]/#tag/@mention extraction, Markdown i/o."
 version.workspace = true

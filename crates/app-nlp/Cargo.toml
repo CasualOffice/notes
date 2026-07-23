@@ -1,4 +1,5 @@
 [package]
+publish = false                 # internal workspace crate — never published to crates.io
 name = "app-nlp"
 description = "Hybrid grammar/regex + LLM-fallback natural-language entry parser (ParsedEntry)."
 version.workspace = true

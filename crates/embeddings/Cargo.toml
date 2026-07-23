@@ -1,4 +1,5 @@
 [package]
+publish = false                 # internal workspace crate — never published to crates.io
 name = "embeddings"
 description = "STUB (later phase): embedding trait + sqlite-vec integration (Matryoshka-256 int8)."
 version.workspace = true

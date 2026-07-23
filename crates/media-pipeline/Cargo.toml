@@ -1,4 +1,5 @@
 [package]
+publish = false                 # internal workspace crate — never published to crates.io
 name = "media-pipeline"
 description = "STUB (later phase): downmix/resample→16k mono f32, DC/gain, VAD, chunking, drift."
 version.workspace = true

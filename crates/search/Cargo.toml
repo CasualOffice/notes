@@ -1,4 +1,5 @@
 [package]
+publish = false                 # internal workspace crate — never published to crates.io
 name = "search"
 description = "FTS5(BM25) ∪ sqlite-vec KNN, RRF fusion, filter compilation."
 version.workspace = true

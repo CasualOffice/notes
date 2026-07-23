@@ -1,4 +1,5 @@
 [package]
+publish = false                 # internal workspace crate — never published to crates.io
 name = "app-domain"
 description = "Shared domain types for Casual Note: IDs, HLC, entity kinds, error taxonomy, and the AppEvent model."
 version.workspace = true

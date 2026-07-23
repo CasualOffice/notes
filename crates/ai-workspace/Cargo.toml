@@ -1,4 +1,5 @@
 [package]
+publish = false                 # internal workspace crate — never published to crates.io
 name = "ai-workspace"
 description = "STUB (later phase): retrieve→RRF→rerank→grounded-decode(AnswerV1)→citation-verify."
 version.workspace = true

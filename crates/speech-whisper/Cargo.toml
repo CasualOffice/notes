@@ -1,4 +1,5 @@
 [package]
+publish = false                 # internal workspace crate — never published to crates.io
 name = "speech-whisper"
 description = "STUB (later phase): whisper.cpp STT adapter (default)."
 version.workspace = true

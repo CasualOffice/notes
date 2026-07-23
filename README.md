@@ -48,25 +48,25 @@ with the network switched off.
 
 ## Features
 
-### 📝 Notes
+### Notes
 A block and Markdown editor with a daily-note journal, `[[wikilinks]]`, `#tags`, backlinks, checklists, code blocks,
 tables, and attachments. Blocks are the spine everything else attaches to.
 
-### ⏰ Reminders
+### Reminders
 Natural-language entry ("remind me every Monday at 9"), full recurrence, and a **dual-layer scheduler** that delivers
 alerts whether the app is open or closed, catches up on anything missed after a restart, and is honest about
 per-platform limits.
 
-### ✅ Tasks
+### Tasks
 A focused planner in the spirit of the best task managers — **Today · Upcoming · Anytime · Someday** — with projects,
 areas, scheduled/deadline dates, and drag-to-reorder. Meeting action items flow straight into tasks.
 
-### 🎙️ Meeting Intelligence
+### Meeting Intelligence
 Capture audio from a selected application and your microphone, transcribe **on-device** with Whisper, and generate
 summaries, decisions, and action items with a **local LLM** — each fact linked to the transcript segment that supports
 it.
 
-### 🔎 Unified Search & AI Workspace
+### Unified Search & AI Workspace
 Hybrid full-text (BM25) and semantic search across every pillar, a command palette to **Go** anywhere and **Do**
 anything, and an AI workspace that answers questions about your knowledge base **with citations** — or honestly refuses.
 

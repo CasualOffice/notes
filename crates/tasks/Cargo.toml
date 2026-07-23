@@ -1,4 +1,5 @@
 [package]
+publish = false                 # internal workspace crate — never published to crates.io
 name = "tasks"
 description = "Areas/projects/headings/tasks/checklists, derived buckets, fractional-index reorder."
 version.workspace = true

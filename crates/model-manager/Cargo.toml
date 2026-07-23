@@ -1,4 +1,5 @@
 [package]
+publish = false                 # internal workspace crate — never published to crates.io
 name = "model-manager"
 description = "STUB (later phase): signed manifests, SHA-256, resumable download, offline import."
 version.workspace = true

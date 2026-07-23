@@ -1,4 +1,5 @@
 [package]
+publish = false                 # internal workspace crate — never published to crates.io
 name = "llm-api"
 description = "STUB (later phase): LLM trait; GBNF-constrained structured output; repair→fallback."
 version.workspace = true

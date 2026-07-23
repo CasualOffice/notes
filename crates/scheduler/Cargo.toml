@@ -1,4 +1,5 @@
 [package]
+publish = false                 # internal workspace crate — never published to crates.io
 name = "scheduler"
 description = "Dual-layer notifier: Tokio timer-wheel + OS one-shot handoff + catch-up sweep."
 version.workspace = true

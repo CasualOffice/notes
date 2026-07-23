@@ -1,4 +1,5 @@
 [package]
+publish = false                 # internal workspace crate — never published to crates.io
 name = "storage"
 description = "SQLCipher store, NDJSON journals, and content-addressed blobs (direct rusqlite, never tauri-plugin-sql)."
 version.workspace = true

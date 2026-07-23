@@ -1,4 +1,5 @@
 [package]
+publish = false                 # internal workspace crate — never published to crates.io
 name = "speech-parakeet"
 description = "STUB (later phase): ONNX Parakeet TDT v3 Turbo (English) opt-in STT adapter."
 version.workspace = true

@@ -1,4 +1,5 @@
 [package]
+publish = false                 # internal workspace crate — never published to crates.io
 name = "app-service"
 description = "Orchestration facade: transactions, cross-crate workflows, AppEvent emission."
 version.workspace = true

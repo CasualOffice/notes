@@ -1,4 +1,5 @@
 [package]
+publish = false                 # internal workspace crate — never published to crates.io
 name = "capture-linux"
 description = "STUB (later phase): Linux PipeWire/WirePlumber + xdg-portal capture adapter."
 version.workspace = true

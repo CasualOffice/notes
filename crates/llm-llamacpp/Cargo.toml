@@ -1,4 +1,5 @@
 [package]
+publish = false                 # internal workspace crate — never published to crates.io
 name = "llm-llamacpp"
 description = "STUB (later phase): llama.cpp/GGUF (Qwen3) adapter; MLX on Apple Silicon."
 version.workspace = true

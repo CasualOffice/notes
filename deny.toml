@@ -4,10 +4,18 @@
 [advisories]
 version = 2
 yanked = "deny"
+# Unmaintained advisories are evaluated only for our own workspace crates. Deep
+# transitive GUI dependencies (gtk-rs GTK3 bindings, unic-* via Tauri/webkit2gtk)
+# are flagged unmaintained upstream with no available fix and are out of our
+# control, so they must not fail the build.
+unmaintained = "workspace"
 
 [bans]
 multiple-versions = "warn"
+# Deny wildcard version requirements on crates.io dependencies, but allow them
+# for our internal path/workspace crates (which resolve to "*" by design).
 wildcards = "deny"
+allow-wildcard-paths = true
 
 [licenses]
 version = 2
@@ -16,6 +24,7 @@ allow = [
   "Apache-2.0",
   "Apache-2.0 WITH LLVM-exception",
   "MIT",
+  "MIT-0",
   "BSD-2-Clause",
   "BSD-3-Clause",
   "ISC",
@@ -25,6 +34,7 @@ allow = [
   "CC0-1.0",
   "MPL-2.0",
   "OpenSSL",
+  "BSL-1.0",
 ]
 confidence-threshold = 0.9
 

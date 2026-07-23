@@ -1,4 +1,5 @@
 [package]
+publish = false                 # internal workspace crate — never published to crates.io
 name = "capture-macos"
 description = "STUB (later phase): macOS ScreenCaptureKit audio capture adapter."
 version.workspace = true
