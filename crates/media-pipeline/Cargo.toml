@@ -1,7 +1,7 @@
 [package]
 publish = false                 # internal workspace crate — never published to crates.io
 name = "media-pipeline"
-description = "STUB (later phase): downmix/resample→16k mono f32, DC/gain, VAD, chunking, drift."
+description = "Deterministic audio DSP: timeline/drift, downmix, resample→16k mono f32, DC/gain/clip, VAD, overlapping chunking + bounded ring."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -9,5 +9,12 @@ authors.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+# Pure-Rust, dependency-light by design (Architecture §5, HLD §8.4). The resampler
+# is a self-contained windowed-sinc polyphase implementation (see `resample.rs`), so
+# no external DSP crate (e.g. rubato) is pulled in — keeping the build deterministic
+# and the supply-chain audit trivially green. Raw PCM never leaves native memory, so
+# no serialization stack (serde) is required here. Only `app-domain` (shared entity
+# ids, read-only) and `thiserror` (workspace-pinned, MIT/Apache) are used.
 [dependencies]
-
+app-domain = { workspace = true }
+thiserror = { workspace = true }

@@ -1,7 +1,7 @@
 [package]
 publish = false                 # internal workspace crate — never published to crates.io
 name = "speech-api"
-description = "STUB (later phase): STT trait (two-pass live+final, model profiles)."
+description = "Contract layer: two-pass (live + final) STT trait, model profiles, and segment/hypothesis types (HLD §9.2)."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -9,5 +9,16 @@ authors.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
-[dependencies]
+[lib]
+name = "speech_api"
 
+# Pure CONTRACT crate: the STT trait + value types. The native backends
+# (speech-whisper / speech-parakeet) own FFI; no unsafe here. PCM is borrowed,
+# never serialized. Depends only on already-vetted workspace crates.
+[dependencies]
+app-domain = { path = "../app-domain" }
+serde = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

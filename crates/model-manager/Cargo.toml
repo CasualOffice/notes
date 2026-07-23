@@ -1,7 +1,7 @@
 [package]
 publish = false                 # internal workspace crate — never published to crates.io
 name = "model-manager"
-description = "STUB (later phase): signed manifests, SHA-256, resumable download, offline import."
+description = "Signed model manifests, SHA-256 verification, disk preflight, hardware-tier recommendation, offline USB import, and a resumable Downloader seam (Architecture §8, Data Model §9.4)."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -9,5 +9,16 @@ authors.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+# Dependency-light by design (Architecture §8): no heavy HTTP client (reqwest/hyper)
+# is pulled in this phase — the real network backend is a deferred seam behind the
+# `Downloader` trait. Only pure-Rust hashing/serde utilities are added here.
 [dependencies]
+app-domain = { path = "../app-domain" }
+serde      = { workspace = true }
+serde_json = { workspace = true }
+thiserror  = { workspace = true }
 
+# --- content-addressing / integrity (SHA-256 + hex) ---
+# sha2/hex are pure-Rust, MIT OR Apache-2.0 licensed, no C, no network.
+sha2 = "0.10.8"
+hex  = "0.4.3"

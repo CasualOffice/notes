@@ -1,7 +1,7 @@
 [package]
 publish = false                 # internal workspace crate — never published to crates.io
 name = "capture-api"
-description = "STUB (later phase): unified capture trait + honest per-platform capability report."
+description = "Contract layer: unified per-application audio-capture trait + honest per-platform capability report (HLD §9.1)."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -9,5 +9,19 @@ authors.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
-[dependencies]
+[lib]
+name = "capture_api"
 
+# Pure CONTRACT crate: trait + honest capability/config/report types. No native
+# FFI here (the capture-macos/windows/linux adapters own that), so unsafe is
+# forbidden. `async-trait` is the only new external dependency; everything else
+# is already vetted in the workspace tree.
+[dependencies]
+app-domain = { path = "../app-domain" }
+serde = { workspace = true }
+thiserror = { workspace = true }
+async-trait = "0.1"
+
+[dev-dependencies]
+tokio = { workspace = true }
+serde_json = { workspace = true }

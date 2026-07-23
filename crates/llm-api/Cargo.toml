@@ -1,7 +1,7 @@
 [package]
 publish = false                 # internal workspace crate — never published to crates.io
 name = "llm-api"
-description = "STUB (later phase): LLM trait; GBNF-constrained structured output; repair→fallback."
+description = "Contract layer: GBNF-constrained LLM trait (repair -> deterministic fallback) + MeetingArtifactV1 / AnswerV1 JSON contracts."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -9,5 +9,14 @@ authors.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
-[dependencies]
+[lib]
+name = "llm_api"
 
+# Pure CONTRACT crate: the LLM trait, the repair->fallback generation contract,
+# and the authoritative MeetingArtifactV1 / AnswerV1 serde structs (Data Model
+# §14). The llm-llamacpp backend owns FFI; no unsafe here.
+[dependencies]
+app-domain = { path = "../app-domain" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
