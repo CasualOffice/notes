@@ -22,7 +22,9 @@ _Last updated: 2026-07-23 — Phase 0 (governance + scaffold) underway._
 - [x] `SKILLS.md` (AI skill registry + dev skills)
 - [x] `TRACKER.md` (this file)
 - [x] `.gitignore`
-- [x] `git init` + first structure commit
+- [x] `git init` + first structure commit + pushed to `github.com:CasualOffice/notes`
+- [x] Marketing site (`site/`): SEO meta + JSON-LD, `llms.txt`, `robots.txt`, `sitemap.xml`, OG/favicon, `CNAME` → `notes.casualoffice.org`
+- [x] CI/CD pipelines (`.github/workflows/`: `ci.yml`, `pages.yml`, `release.yml`) + `deny.toml` supply-chain policy
 
 ---
 
@@ -106,7 +108,7 @@ _Last updated: 2026-07-23 — Phase 0 (governance + scaffold) underway._
 ---
 
 ## Cross-cutting (W12 — continuous)
-- [ ] CI: fmt + clippy + test + offline-network-isolation job + telemetry-absence scan
+- [~] CI: fmt + clippy + test (multi-OS) + supply-chain audit + telemetry-absence scan _(pipeline in place; goes green once the scaffold compiles clean)_
 - [ ] Packaging: macOS DMG/notarize · Windows MSI Authenticode · Linux AppImage + Flatpak
 - [ ] Accessibility audit (keyboard-only, screen readers, contrast, reduced-motion)
 - [ ] Performance harness on reference tiers (launch/capture/transcript/save/FTS/memory budgets)

@@ -1,0 +1,32 @@
+# Casual Note
+
+> A fully-local, privacy-first desktop notebook that unifies notes, reminders, tasks, and AI meeting intelligence into one encrypted, on-device store. No cloud, no account, no telemetry. It runs entirely on the user's machine; the network is used only, and with explicit consent, to download AI models and check for app updates.
+
+Casual Note is *casually a notebook* — notes, tasks, and reminders — that is also a best-in-class local meeting recorder and understander. Four pillars share one encrypted SQLite/SQLCipher store, one search index, one link graph, and one evidence-citing AI workspace. It is built as a Tauri 2 + Rust desktop application with a React/TypeScript UI, using whisper.cpp for on-device speech-to-text and llama.cpp for a local LLM. It is free and open source under Apache-2.0 and targets macOS, Windows, and Linux.
+
+## The four pillars
+
+- **Notes**: a block/Markdown editor with daily notes, `[[wikilinks]]`, `#tags`, backlinks, checklists, and attachments.
+- **Reminders**: natural-language entry with recurrence and a dual-layer scheduler that delivers alerts whether the app is open or closed, with catch-up for anything missed.
+- **Tasks**: a Things-style planner — Today, Upcoming, Anytime, Someday — with projects and areas; meeting action items flow directly into tasks.
+- **Meeting Intelligence**: captures selected-application and microphone audio, transcribes locally, and produces summaries, decisions, and action items with a local LLM, with every fact linked to transcript evidence.
+
+## Documentation
+
+- [Product Requirements (PRD)](https://github.com/CasualOffice/notes/blob/main/docs/casual-note-prd.md): vision, personas, requirements, and non-goals.
+- [System Architecture](https://github.com/CasualOffice/notes/blob/main/docs/casual-note-architecture.md): decomposition, threading, security, and packaging.
+- [High-Level Design](https://github.com/CasualOffice/notes/blob/main/docs/casual-note-hld.md): the Tauri command surface, event model, adapter traits, and sequence flows.
+- [Data Model](https://github.com/CasualOffice/notes/blob/main/docs/casual-note-data-model.md): the authoritative SQLite/SQLCipher schema and JSON contracts.
+- [Feature Specifications](https://github.com/CasualOffice/notes/blob/main/docs/casual-note-feature-specs.md): per-feature behavior and acceptance criteria.
+- [Roadmap](https://github.com/CasualOffice/notes/blob/main/docs/casual-note-roadmap.md): sequencing, milestones, and test strategy.
+
+## Key facts
+
+- License: Apache-2.0. Repository: https://github.com/CasualOffice/notes
+- Privacy: local-only data; encrypted at rest (SQLCipher, key in the OS keychain); zero telemetry by default.
+- Platforms: macOS, Windows, Linux. Status: under active development toward the v0.1 Core Notebook milestone.
+
+## Optional
+
+- [Security policy](https://github.com/CasualOffice/notes/blob/main/SECURITY.md): guarantees and vulnerability reporting.
+- [Contributing guide](https://github.com/CasualOffice/notes/blob/main/CONTRIBUTING.md): how to build and contribute.

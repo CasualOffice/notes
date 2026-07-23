@@ -1,0 +1,72 @@
+name: Release
+
+# Builds signed, cross-platform desktop installers when a version tag is pushed.
+# Triggered only on tags (v*), so it never runs on ordinary commits.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            target: universal-apple-darwin
+          - platform: ubuntu-latest
+            target: ""
+          - platform: windows-latest
+            target: ""
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux system dependencies
+        if: matrix.platform == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev libsoup-3.0-dev libayatana-appindicator3-dev \
+            librsvg2-dev patchelf libssl-dev build-essential libxdo-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+
+      - name: Install frontend deps
+        run: pnpm install --frozen-lockfile
+        working-directory: ui
+
+      - name: Build & bundle (Tauri)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Code-signing secrets (configure in repo settings before first signed release):
+          #   APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD, APPLE_SIGNING_IDENTITY,
+          #   APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID           (macOS notarization)
+          #   WINDOWS_CERTIFICATE, WINDOWS_CERTIFICATE_PASSWORD  (Authenticode)
+          #   TAURI_SIGNING_PRIVATE_KEY, TAURI_SIGNING_PRIVATE_KEY_PASSWORD (updater)
+        with:
+          args: ${{ matrix.target && format('--target {0}', matrix.target) || '' }}
+          tagName: ${{ github.ref_name }}
+          releaseName: "Casual Note ${{ github.ref_name }}"
+          releaseBody: "See CHANGELOG.md for release notes."
+          releaseDraft: true
+          prerelease: false

@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="theme-color" content="#faf7f2" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#14110d" media="(prefers-color-scheme: dark)" />
+
+  <title>Casual Note — a fully-local, private notebook that masters your meetings</title>
+  <meta name="description" content="Casual Note is a fully-local, privacy-first desktop notebook that unifies notes, reminders, tasks, and AI meeting intelligence in one encrypted store. No cloud. No account. No telemetry. Everything runs on your device." />
+  <meta name="keywords" content="local-first notebook, private notes app, offline meeting notes, on-device AI, local LLM, whisper transcription, tasks and reminders, encrypted notes, Obsidian alternative, Things alternative, Granola alternative, SQLite notebook, Tauri app" />
+  <meta name="author" content="Casual Note contributors" />
+  <meta name="robots" content="index, follow, max-image-preview:large" />
+  <link rel="canonical" href="https://notes.casualoffice.org/" />
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Casual Note" />
+  <meta property="og:title" content="Casual Note — a fully-local, private notebook that masters your meetings" />
+  <meta property="og:description" content="Notes, reminders, tasks, and AI meeting intelligence — unified in one encrypted, on-device notebook. No cloud. No account. No telemetry." />
+  <meta property="og:url" content="https://notes.casualoffice.org/" />
+  <meta property="og:image" content="https://notes.casualoffice.org/og.svg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="Casual Note — casually a notebook, quietly the best local meeting assistant" />
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Casual Note — a fully-local, private notebook that masters your meetings" />
+  <meta name="twitter:description" content="Notes, reminders, tasks, and AI meeting intelligence — unified in one encrypted, on-device notebook. No cloud. No account. No telemetry." />
+  <meta name="twitter:image" content="https://notes.casualoffice.org/og.svg" />
+
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="sitemap" type="application/xml" href="/sitemap.xml" />
+
+  <!-- Structured data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Casual Note",
+    "applicationCategory": "ProductivityApplication",
+    "operatingSystem": "macOS, Windows, Linux",
+    "description": "A fully-local, privacy-first desktop notebook that unifies notes, reminders, tasks, and AI meeting intelligence in one encrypted, on-device store. No cloud, no account, no telemetry.",
+    "url": "https://notes.casualoffice.org/",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "featureList": [
+      "Local-first block & Markdown notebook with backlinks",
+      "Natural-language reminders with recurrence",
+      "Things-style tasks: Today, Upcoming, Anytime, Someday",
+      "On-device meeting transcription and AI summaries",
+      "Unified search and evidence-citing AI workspace",
+      "End-to-end local encryption, zero telemetry"
+    ]
+  }
+  </script>
+
+  <style>
+    :root{
+      --bg:#faf7f2; --bg-soft:#f3ede3; --card:#fffdf9; --text:#1e1b16; --muted:#6b6357;
+      --line:#e6ddce; --accent:#b45309; --accent-2:#0f766e; --ring:rgba(180,83,9,.28);
+      --shadow:0 1px 2px rgba(30,27,22,.04),0 8px 24px rgba(30,27,22,.06);
+    }
+    @media (prefers-color-scheme: dark){
+      :root{
+        --bg:#14110d; --bg-soft:#1b1712; --card:#1f1a13; --text:#f0ebe2; --muted:#a89e8d;
+        --line:#332c22; --accent:#f59e0b; --accent-2:#2dd4bf; --ring:rgba(245,158,11,.30);
+        --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
+      }
+    }
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{
+      margin:0; background:var(--bg); color:var(--text);
+      font:400 17px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,"Apple Color Emoji",sans-serif;
+      -webkit-font-smoothing:antialiased;
+    }
+    a{color:var(--accent); text-decoration:none}
+    a:hover{text-decoration:underline}
+    .wrap{max-width:1040px; margin:0 auto; padding:0 22px}
+    h1,h2,h3{line-height:1.15; letter-spacing:-.02em; margin:0}
+    .eyebrow{font-size:.8rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--accent)}
+
+    /* Nav */
+    header.nav{position:sticky; top:0; z-index:10; backdrop-filter:saturate(1.4) blur(8px);
+      background:color-mix(in srgb,var(--bg) 82%, transparent); border-bottom:1px solid var(--line)}
+    .nav .wrap{display:flex; align-items:center; justify-content:space-between; height:62px}
+    .brand{display:flex; align-items:center; gap:10px; font-weight:700; letter-spacing:-.01em; color:var(--text)}
+    .brand:hover{text-decoration:none}
+    .logo{width:26px;height:26px}
+    .nav nav{display:flex; gap:22px; align-items:center}
+    .nav nav a{color:var(--muted); font-size:.95rem; font-weight:600}
+    .nav nav a:hover{color:var(--text); text-decoration:none}
+    .btn{display:inline-flex; align-items:center; gap:8px; padding:10px 16px; border-radius:10px; font-weight:650;
+      border:1px solid transparent; cursor:pointer; transition:transform .06s ease, box-shadow .2s ease}
+    .btn:hover{text-decoration:none; transform:translateY(-1px)}
+    .btn-primary{background:var(--accent); color:#fff; box-shadow:var(--shadow)}
+    .btn-ghost{border-color:var(--line); color:var(--text); background:var(--card)}
+    @media (max-width:720px){ .nav nav .hide-sm{display:none} }
+
+    /* Hero */
+    .hero{padding:84px 0 48px; text-align:center}
+    .hero .badge{display:inline-flex; gap:8px; align-items:center; padding:6px 12px; border-radius:999px;
+      border:1px solid var(--line); background:var(--card); color:var(--muted); font-size:.85rem; font-weight:600}
+    .dot{width:8px;height:8px;border-radius:50%;background:var(--accent-2);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent-2) 22%,transparent)}
+    .hero h1{font-size:clamp(2.3rem,6vw,4rem); font-weight:800; margin:22px auto 0; max-width:16ch}
+    .hero .tag{font-size:clamp(1.05rem,2.5vw,1.35rem); color:var(--muted); margin:18px auto 0; max-width:52ch}
+    .hero .cta{display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-top:30px}
+    .subtle{color:var(--muted); font-size:.9rem; margin-top:16px}
+
+    /* Pills */
+    .pillars{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin:40px 0 0}
+    @media (max-width:720px){ .pillars{grid-template-columns:repeat(2,1fr)} }
+    .pill{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px; box-shadow:var(--shadow)}
+    .pill .ic{font-size:1.5rem}
+    .pill h3{font-size:1.02rem; margin:10px 0 4px}
+    .pill p{margin:0; color:var(--muted); font-size:.9rem}
+
+    section{padding:56px 0; border-top:1px solid var(--line)}
+    .section-head{max-width:60ch}
+    .section-head h2{font-size:clamp(1.6rem,3.5vw,2.2rem); font-weight:800; margin-top:10px}
+    .section-head p{color:var(--muted); margin-top:12px}
+
+    .grid{display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-top:34px}
+    @media (max-width:820px){ .grid{grid-template-columns:1fr} }
+    .feat{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:22px; box-shadow:var(--shadow)}
+    .feat h3{font-size:1.08rem; display:flex; align-items:center; gap:10px}
+    .feat p{color:var(--muted); margin:.5rem 0 0; font-size:.95rem}
+
+    .privacy{background:var(--bg-soft)}
+    .checks{display:grid; grid-template-columns:repeat(2,1fr); gap:12px 26px; margin-top:26px}
+    @media (max-width:720px){ .checks{grid-template-columns:1fr} }
+    .check{display:flex; gap:12px; align-items:flex-start}
+    .check svg{flex:0 0 22px; margin-top:2px; color:var(--accent-2)}
+    .check b{display:block} .check span{color:var(--muted); font-size:.92rem}
+
+    .stack{display:flex; flex-wrap:wrap; gap:10px; margin-top:26px}
+    .chip{border:1px solid var(--line); background:var(--card); border-radius:999px; padding:8px 14px; font-size:.88rem; font-weight:600; color:var(--muted)}
+    .chip b{color:var(--text)}
+
+    .cta-band{text-align:center}
+    .cta-band h2{font-size:clamp(1.7rem,4vw,2.4rem); font-weight:800}
+    .cta-band p{color:var(--muted); max-width:48ch; margin:14px auto 0}
+
+    footer{border-top:1px solid var(--line); padding:40px 0; color:var(--muted); font-size:.9rem}
+    .foot{display:flex; justify-content:space-between; gap:20px; flex-wrap:wrap; align-items:center}
+    .foot nav{display:flex; gap:18px; flex-wrap:wrap}
+    .foot nav a{color:var(--muted); font-weight:600}
+    .status{display:inline-flex; gap:8px; align-items:center; font-size:.82rem}
+  </style>
+</head>
+<body>
+  <header class="nav">
+    <div class="wrap">
+      <a class="brand" href="/">
+        <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect x="5" y="3" width="20" height="26" rx="3" fill="var(--accent)"/><rect x="5" y="3" width="6" height="26" rx="3" fill="var(--accent-2)"/><line x1="15" y1="10" x2="21" y2="10" stroke="#fff" stroke-width="2" stroke-linecap="round"/><line x1="15" y1="15" x2="21" y2="15" stroke="#fff" stroke-width="2" stroke-linecap="round"/><line x1="15" y1="20" x2="19" y2="20" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
+        Casual Note
+      </a>
+      <nav>
+        <a class="hide-sm" href="#pillars">Pillars</a>
+        <a class="hide-sm" href="#features">Features</a>
+        <a class="hide-sm" href="#privacy">Privacy</a>
+        <a class="btn btn-ghost" href="https://github.com/CasualOffice/notes" rel="noopener">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="wrap">
+      <section class="hero" style="border-top:none">
+        <span class="badge"><span class="dot"></span> 100% local · no cloud · no account · no telemetry</span>
+        <h1>Casually a notebook. Quietly, the best local meeting assistant.</h1>
+        <p class="tag">Casual Note unifies your <strong>notes, reminders, tasks,</strong> and <strong>AI meeting intelligence</strong> into one encrypted notebook that runs entirely on your device.</p>
+        <div class="cta">
+          <a class="btn btn-primary" href="https://github.com/CasualOffice/notes" rel="noopener">
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+            View on GitHub
+          </a>
+          <a class="btn btn-ghost" href="https://github.com/CasualOffice/notes/tree/main/docs" rel="noopener">Read the docs</a>
+        </div>
+        <p class="subtle">macOS · Windows · Linux — free &amp; open source (Apache-2.0). <span class="status"><span class="dot"></span> Pre-alpha, in active development.</span></p>
+
+        <div class="pillars" id="pillars">
+          <div class="pill"><div class="ic">📝</div><h3>Notes</h3><p>Block &amp; Markdown editor, daily notes, <code>[[backlinks]]</code>, tags, checklists.</p></div>
+          <div class="pill"><div class="ic">⏰</div><h3>Reminders</h3><p>Natural-language entry, recurrence, native alerts that survive app close.</p></div>
+          <div class="pill"><div class="ic">✅</div><h3>Tasks</h3><p>Today · Upcoming · Anytime · Someday, with projects &amp; areas.</p></div>
+          <div class="pill"><div class="ic">🎙️</div><h3>Meetings</h3><p>On-device transcription &amp; AI summaries. Action items become tasks.</p></div>
+        </div>
+      </section>
+    </div>
+
+    <section id="features">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="eyebrow">One app, one brain</span>
+          <h2>Four pillars, unified — not four apps stitched together</h2>
+          <p>Everything shares one encrypted store, one search index, one link graph, and one evidence-citing AI workspace. A task links to the note that spawned it; a meeting becomes a note; a reminder targets any of them.</p>
+        </div>
+        <div class="grid">
+          <div class="feat"><h3>✍️ A notebook that thinks in blocks</h3><p>A fast block/Markdown editor with wiki-links, backlinks, tags, and a daily-note journal — your everyday surface and the spine everything attaches to.</p></div>
+          <div class="feat"><h3>🗣️ Type it the way you'd say it</h3><p>“remind me every Monday 9am”, “#idea call Sam next Friday” — natural-language capture routes to a note, task, or reminder, and never invents a date it isn't sure about.</p></div>
+          <div class="feat"><h3>🎧 Meetings, understood locally</h3><p>Capture app + mic audio, transcribe on-device with Whisper, and generate summaries, decisions, and action items with a local LLM — every fact linked to transcript evidence.</p></div>
+          <div class="feat"><h3>🔎 Ask your whole knowledge base</h3><p>Hybrid full-text + semantic search and an AI workspace that answers with citations — or honestly says it doesn't know, rather than making something up.</p></div>
+          <div class="feat"><h3>🔁 Reminders you can trust</h3><p>A belt-and-suspenders scheduler fires alerts whether the app is open or closed, catches up on anything missed, and is honest about platform limits.</p></div>
+          <div class="feat"><h3>💾 Your data, one encrypted file</h3><p>SQLite + SQLCipher on your disk. Crash-safe by design. Export to Markdown, PDF, or JSON anytime. It's your notebook — you own it.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="privacy" class="privacy">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="eyebrow">Privacy by design, not by setting</span>
+          <h2>Nothing leaves your device</h2>
+          <p>The network is touched by exactly two named, consent-gated services: downloading AI models and checking for app updates. Everything else — recording, transcription, AI, search, storage — works with the internet switched off.</p>
+        </div>
+        <div class="checks">
+          <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b>No cloud, no account</b><span>Fully offline after model install. No sign-up, ever.</span></div></div>
+          <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b>Encrypted at rest</b><span>SQLCipher store; the key lives in your OS keychain.</span></div></div>
+          <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b>Zero telemetry by default</b><span>The shipped binary is scanned to prove it phones home to no one.</span></div></div>
+          <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b>On-device AI</b><span>Whisper + a local LLM. Your audio and notes never hit an API.</span></div></div>
+          <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b>Open source</b><span>Apache-2.0. Audit it, fork it, run it forever.</span></div></div>
+          <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b>Honest about limits</b><span>Platform constraints are reported, never silently worked around.</span></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <div class="section-head">
+          <span class="eyebrow">Built to last</span>
+          <h2>A calm, native-feeling desktop app</h2>
+          <p>A small, fast Rust core behind a modern web UI — no Electron bloat, no background daemons, no surprises.</p>
+        </div>
+        <div class="stack">
+          <span class="chip"><b>Tauri 2</b> shell</span>
+          <span class="chip"><b>Rust</b> core</span>
+          <span class="chip"><b>React + TypeScript</b> UI</span>
+          <span class="chip"><b>SQLite + SQLCipher</b> store</span>
+          <span class="chip"><b>whisper.cpp</b> speech</span>
+          <span class="chip"><b>llama.cpp</b> local LLM</span>
+          <span class="chip"><b>FTS5 + vector</b> search</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="cta-band">
+      <div class="wrap">
+        <h2>Own your notebook. Own your meetings.</h2>
+        <p>Casual Note is in active, open development. Follow along, read the design docs, or contribute.</p>
+        <div class="cta" style="justify-content:center;margin-top:24px">
+          <a class="btn btn-primary" href="https://github.com/CasualOffice/notes" rel="noopener">Star on GitHub</a>
+          <a class="btn btn-ghost" href="https://github.com/CasualOffice/notes/blob/main/docs/casual-note-roadmap.md" rel="noopener">See the roadmap</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap foot">
+      <div>© 2026 Casual Note contributors · <a href="https://github.com/CasualOffice/notes/blob/main/LICENSE" rel="noopener">Apache-2.0</a></div>
+      <nav>
+        <a href="https://github.com/CasualOffice/notes" rel="noopener">GitHub</a>
+        <a href="https://github.com/CasualOffice/notes/tree/main/docs" rel="noopener">Docs</a>
+        <a href="https://github.com/CasualOffice/notes/blob/main/SECURITY.md" rel="noopener">Security</a>
+        <a href="/llms.txt">llms.txt</a>
+      </nav>
+    </div>
+  </footer>
+</body>
+</html>
