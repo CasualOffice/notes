@@ -71,7 +71,7 @@ fi
 step "telemetry-absence scan"
 if grep -RInE "reqwest|hyper::client|TcpStream::connect|ureq::(get|post)|https?://" \
      crates --include='*.rs' \
-     | grep -vE "crates/(model-manager|updater)/" \
+     | grep -vE "crates/(model-manager|updater|calendar)/" \
      | grep -vE "^\s*//|doc =|///" >/tmp/cn_telemetry_hits 2>/dev/null && [[ -s /tmp/cn_telemetry_hits ]]; then
   printf '%s   FAIL%s telemetry scan — network usage outside allowed crates:\n' "$red" "$rst"; cat /tmp/cn_telemetry_hits; FAILED+=("telemetry-scan")
 else

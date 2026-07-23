@@ -118,10 +118,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Scan for network/telemetry calls outside allowed crates
         run: |
-          echo "Only crates/model-manager and crates/*updat* may open sockets."
+          echo "Only crates/model-manager, updater, and calendar (user-consented CalDAV sync) may open sockets."
           if grep -RInE "reqwest|hyper::client|TcpStream::connect|ureq::(get|post)|https?://" \
                crates --include='*.rs' \
-               | grep -vE "crates/(model-manager|updater)/" \
+               | grep -vE "crates/(model-manager|updater|calendar)/" \
                | grep -vE "^\s*//|doc =|///"; then
             echo "::error::Unexpected network usage found outside allowed crates."
             exit 1
