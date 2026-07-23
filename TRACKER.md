@@ -4,7 +4,7 @@ Live build status. **Checked the moment a unit is complete _and_ verified.** Leg
 `[x]` done · `[!]` blocked. Milestones (M0–M8) and workstreams (W1–W12) reference
 [`docs/casual-note-roadmap.md`](./docs/casual-note-roadmap.md).
 
-_Last updated: 2026-07-23 — **M0 + M1 complete** (notebook usable) and **Phase-2 engine foundations** landed; full `./scripts/ci-local.sh` green. Next: M2 (meeting session pipeline)._
+_Last updated: 2026-07-23 — **M0 + M1 complete**; Phase-2 engine foundations landed. **In flight (parallel, multi-agent):** M2 meeting pipeline (session state machine + coordinator + Meetings UI) and Phase-3 engines (embeddings + AI workspace + vector search) — both driven off the engine traits with mock backends; native FFI (whisper/llama/OS-capture) is a later dedicated pass._
 
 ---
 
@@ -85,8 +85,8 @@ _**M0 and M1 are DONE**, verified green via `./scripts/ci-local.sh`. Phase-2 eng
 - [~] W5 Capture: `capture-api` trait + capability/DTO contracts done; **`media-pipeline` DSP done** (downmix, 16 kHz resample, VAD, chunking, ring buffer — tested); native OS adapters (SCK/WASAPI/PipeWire FFI) pending
 - [~] W6 STT: `speech-api` trait + segment/hypothesis/profile types done; whisper.cpp FFI adapter pending
 - [~] W7 LLM & artifacts: `llm-api` trait + **MeetingArtifactV1 / AnswerV1 types** done; llama.cpp FFI + GBNF-constrained decode + repair→fallback pending
-- [ ] W10 Session state machine `NEW→…→COMPLETE` (+DEGRADED/FAILED/RECOVERING); INDEXING writes spine+FTS
-- [ ] Cross-pillar bridge: action-item → Task (`spawned_from` + evidence); meeting-as-note
+- [~] W10 Session state machine `NEW→…→COMPLETE` (+DEGRADED/FAILED/RECOVERING); INDEXING writes spine+FTS _(M2 in progress)_
+- [~] Cross-pillar bridge: action-item → Task (`spawned_from` + evidence); meeting-as-note _(M2 in progress)_
 - [x] W9 Model manager: signed manifests, SHA-256 verify, disk preflight, offline import, hardware-tier select (resumable HTTP downloader behind a trait; real network impl deferred)
 - [ ] W4 NL LLM fallback enabled (resident model exists)
 - [ ] **M4** Local capture · **M5** Transcribe & understand · **M6** *Phase 2 ship (v0.5)*
@@ -94,9 +94,9 @@ _**M0 and M1 are DONE**, verified green via `./scripts/ci-local.sh`. Phase-2 eng
 ---
 
 ## Phase 3 — Semantic Search, AI Workspace & Neighborhood Graph  → ship v1.0
-- [ ] W8 Embeddings: `embeddings` crate + gemma/bge adapters; Matryoshka-256 + int8; incremental, content-hash-gated
-- [ ] W8 Hybrid search: FTS5 ∪ sqlite-vec KNN fused by RRF; typed filters → SQL; optional bge-reranker
-- [ ] W7 AI workspace: retrieve→RRF→rerank→grounded-decode **AnswerV1**→citation-verify→refuse; palette **Ask** mode
+- [~] W8 Embeddings: `embeddings` crate — trait + deterministic mock embedder + `sqlite-vec` seam; real gemma/bge model + Matryoshka-256/int8 deferred _(Phase-3 in progress)_
+- [~] W8 Hybrid search: FTS5 ∪ sqlite-vec KNN fused by RRF; typed filters → SQL _(Phase-3 in progress)_
+- [~] W7 AI workspace: retrieve→RRF→rerank→grounded-decode **AnswerV1**→citation-verify→refuse against `llm-api` (MockLlm); palette **Ask** mode _(Phase-3 in progress)_
 - [ ] Suggestions: reversible, cited auto-link/auto-tag `suggestion` rows + approval UI
 - [ ] Neighborhood graph view over the link table
 - [ ] **M7** Semantic + Ask · **M8** *Phase 3 ship (v1.0)*
