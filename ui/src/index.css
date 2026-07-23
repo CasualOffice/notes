@@ -1,0 +1,425 @@
+/*
+ * Casual Note — WebView shell design system.
+ *
+ * Warm paper/ink surfaces with a single cognac accent, matching the marketing
+ * site (site/index.html). Light/dark aware via `prefers-color-scheme`. No emojis,
+ * no decorative noise — a calm, professional writing surface.
+ */
+
+:root {
+  --bg: #fbfaf7;
+  --surface: #ffffff;
+  --surface-2: #f5f1ea;
+  --text: #161310;
+  --muted: #6e665b;
+  --faint: #8a8173;
+  --line: #e9e2d6;
+  --accent: #9a5b27;
+  --accent-ink: #7c4a1f;
+  --ring: rgba(154, 91, 39, 0.2);
+  --shadow-sm: 0 1px 2px rgba(22, 19, 16, 0.05);
+  --shadow: 0 2px 4px rgba(22, 19, 16, 0.04), 0 12px 32px -8px rgba(22, 19, 16, 0.1);
+
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, Georgia,
+    "Times New Roman", serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --radius: 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #100e0b;
+    --surface: #171410;
+    --surface-2: #1e1a15;
+    --text: #f2eee6;
+    --muted: #a79e90;
+    --faint: #7a7162;
+    --line: #2a251e;
+    --accent: #e1a96a;
+    --accent-ink: #eebe85;
+    --ring: rgba(225, 169, 106, 0.26);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow: 0 2px 4px rgba(0, 0, 0, 0.3), 0 12px 32px -8px rgba(0, 0, 0, 0.5);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+::selection {
+  background: var(--ring);
+}
+
+/* ---- App shell -------------------------------------------------------- */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.brand-mark {
+  font-family: var(--serif);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.brand-sub {
+  font-size: 11px;
+  color: var(--faint);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.mode-pill {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 10px;
+  background: var(--surface-2);
+}
+
+/* ---- Quick capture ---------------------------------------------------- */
+
+.capture {
+  flex: 1;
+  max-width: 620px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.capture-row {
+  display: flex;
+  gap: 8px;
+}
+
+.capture input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg);
+  outline: none;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+
+.capture input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+.capture-hint {
+  font-size: 11px;
+  color: var(--faint);
+  min-height: 15px;
+}
+
+.capture-hint .route {
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+/* ---- Buttons ---------------------------------------------------------- */
+
+.btn {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 8px 14px;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.btn:hover {
+  border-color: var(--accent);
+}
+
+.btn-accent {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+@media (prefers-color-scheme: dark) {
+  .btn-accent {
+    color: #100e0b;
+    font-weight: 600;
+  }
+}
+
+.btn-accent:hover {
+  background: var(--accent-ink);
+  border-color: var(--accent-ink);
+}
+
+.btn-ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+  padding: 6px 8px;
+}
+
+.btn-ghost:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+/* ---- Two-pane body ---------------------------------------------------- */
+
+.workspace {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 272px 1fr;
+  min-height: 0;
+}
+
+.sidebar {
+  border-right: 1px solid var(--line);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+}
+
+.sidebar-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+}
+
+.note-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 8px 16px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.note-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 10px;
+  padding: 9px 11px;
+  margin-bottom: 2px;
+  transition: background 0.1s;
+}
+
+.note-item:hover {
+  background: var(--surface-2);
+}
+
+.note-item.active {
+  background: var(--surface-2);
+  border-color: var(--line);
+}
+
+.note-item-title {
+  font-family: var(--serif);
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.note-item-title.untitled {
+  color: var(--faint);
+  font-style: italic;
+}
+
+.note-item-meta {
+  font-size: 11px;
+  color: var(--faint);
+  margin-top: 2px;
+}
+
+.empty {
+  color: var(--faint);
+  font-size: 13px;
+  padding: 14px 12px;
+}
+
+/* ---- Editor pane ------------------------------------------------------ */
+
+.editor-pane {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  background: var(--bg);
+}
+
+.editor-inner {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 40px 40px 120px;
+}
+
+.editor-status {
+  display: flex;
+  justify-content: flex-end;
+  font-size: 11px;
+  color: var(--faint);
+  font-family: var(--mono);
+  height: 16px;
+}
+
+.ProseMirror {
+  outline: none;
+  font-family: var(--serif);
+  font-size: 18px;
+  line-height: 1.7;
+  color: var(--text);
+  min-height: 60vh;
+}
+
+.ProseMirror p {
+  margin: 0 0 0.8em;
+}
+
+.ProseMirror h1 {
+  font-size: 30px;
+  font-weight: 600;
+  margin: 0 0 0.4em;
+  line-height: 1.2;
+}
+
+.ProseMirror h2 {
+  font-size: 23px;
+  font-weight: 600;
+  margin: 1em 0 0.3em;
+}
+
+.ProseMirror h3 {
+  font-size: 19px;
+  font-weight: 600;
+  margin: 0.9em 0 0.3em;
+}
+
+.ProseMirror ul,
+.ProseMirror ol {
+  padding-left: 1.4em;
+  margin: 0 0 0.8em;
+}
+
+.ProseMirror blockquote {
+  border-left: 3px solid var(--accent);
+  margin: 0 0 0.8em;
+  padding-left: 1em;
+  color: var(--muted);
+}
+
+.ProseMirror code {
+  font-family: var(--mono);
+  font-size: 0.85em;
+  background: var(--surface-2);
+  border-radius: 5px;
+  padding: 0.1em 0.35em;
+}
+
+.ProseMirror pre {
+  font-family: var(--mono);
+  font-size: 0.85em;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  overflow-x: auto;
+}
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--faint);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.editor-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--faint);
+  gap: 12px;
+  text-align: center;
+  padding: 40px;
+}
+
+/* ---- Error banner ----------------------------------------------------- */
+
+.error-banner {
+  padding: 8px 18px;
+  background: rgba(154, 91, 39, 0.08);
+  border-bottom: 1px solid var(--line);
+  color: var(--accent-ink);
+  font-size: 13px;
+}

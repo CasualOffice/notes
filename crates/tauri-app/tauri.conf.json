@@ -21,10 +21,24 @@
         "minHeight": 480,
         "resizable": true,
         "fullscreen": false
+      },
+      {
+        "label": "quick-capture",
+        "title": "Quick Capture",
+        "url": "index.html",
+        "width": 560,
+        "height": 140,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "center": true,
+        "visible": false,
+        "focus": false
       }
     ],
     "security": {
-      "capabilities": ["main-window"],
+      "capabilities": ["main-window", "quick-capture"],
       "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: asset: http://asset.localhost; font-src 'self'; connect-src 'self' ipc: http://ipc.localhost; media-src 'self' asset: http://asset.localhost; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'",
       "freezePrototype": true
     }

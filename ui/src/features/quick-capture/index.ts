@@ -1,4 +1,3 @@
 // feature: quick-capture
-// Global quick-capture panel (HLD §8.2)
-// Phase-1 placeholder — module wiring lands with its backing HLD §6 commands.
-export {};
+// Intent-routed quick-capture input (HLD §8.2).
+export { QuickCapture } from "./QuickCapture";

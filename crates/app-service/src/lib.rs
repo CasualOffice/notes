@@ -32,7 +32,7 @@ use std::sync::Mutex;
 
 use app_domain::{AppError, AppEvent, AppResult, Hlc, SequencedEvent, Timestamp};
 use rusqlite::Connection;
-use storage::{EntityOp, StorageResult, Store};
+use storage::{DevFileKeyStore, EntityOp, KeyMaterial, Paths, StorageResult, Store};
 
 /// Re-exported so `tauri-app` (which depends on `app-service`, not `app-nlp`) can
 /// name the `nlp.parse` return type without a direct `app-nlp` dependency.
@@ -63,6 +63,21 @@ impl std::fmt::Debug for Service {
 }
 
 impl Service {
+    /// Open the encrypted store rooted at `paths` and build the service over it
+    /// (the M0 boot path — HLD §4). The SQLCipher master key is provisioned from
+    /// the OS keystore, with a `0600` dev-file fallback for headless boxes (Data
+    /// Model §13.1). This is the single place `app-service` owns store custody, so
+    /// `tauri-app` and headless tests open the DB identically.
+    ///
+    /// # Errors
+    /// Returns an [`AppError`] if the key cannot be provisioned or the store fails
+    /// to open / migrate.
+    pub fn open(paths: Paths, node: impl Into<String>, sink: EventSink) -> AppResult<Self> {
+        let key = provision_master_key(&paths)?;
+        let store = Store::open(paths, key)?;
+        Ok(Self::new(store, node, sink))
+    }
+
     /// Build a service over `store`. `node` is the stable HLC node id for this
     /// install; `sink` receives every emitted event.
     #[must_use]
@@ -119,5 +134,24 @@ impl Service {
     /// Current wall instant in epoch-ms UTC.
     pub(crate) fn now_ms(&self) -> i64 {
         Timestamp::now().as_millis()
+    }
+}
+
+/// Provision the SQLCipher master key for the store at `paths`: the OS keystore
+/// first (Keychain / Credential Manager / Secret Service), then a `0600` dev-file
+/// beside the DB as a headless fallback (Data Model §13.1; the fallback warns
+/// loudly). `storage`'s `os-keystore` feature is on by default, so
+/// [`storage::KeyringKeyStore`] exists here.
+///
+/// # Errors
+/// Returns [`AppError::Storage`] if neither backend can yield a key.
+pub fn provision_master_key(paths: &Paths) -> AppResult<KeyMaterial> {
+    match storage::keystore::provision_db_key(&storage::KeyringKeyStore::new()) {
+        Ok(k) => Ok(k),
+        Err(e) => {
+            tracing::warn!(error = %e, "OS keystore unavailable; falling back to dev key file");
+            let dev = DevFileKeyStore::new(paths.root().join(".dev-db-key"));
+            Ok(storage::keystore::provision_db_key(&dev)?)
+        }
     }
 }

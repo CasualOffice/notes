@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "quick-capture",
+  "description": "Deny-by-default baseline for the frameless quick-capture window (HLD §8.2): only command invocation and the AppEvent channel are granted, matching the main window. The global shortcut that toggles this window is registered Rust-side, so no `global-shortcut` JS permission is granted here. Feature permissions are added explicitly as the corresponding HLD §6 commands land — never broadly. See Architecture §9/§12.",
+  "local": true,
+  "windows": ["quick-capture"],
+  "permissions": ["core:default", "core:event:default"]
+}

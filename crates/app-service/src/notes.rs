@@ -7,7 +7,9 @@ use rusqlite::{params, Connection, OptionalExtension};
 use serde_json::Value;
 use storage::{BlockRow, DetailTable, LinkRow, OpBody};
 
-use crate::dto::{BacklinkView, BlockView, LinkResolution, NoteSummary, NoteView, SaveResult};
+use crate::dto::{
+    BacklinkView, BlockView, LinkResolution, Note, NoteSummary, NoteView, SaveResult,
+};
 use crate::util::{self, Columns};
 use crate::Service;
 
@@ -57,6 +59,175 @@ fn empty_doc() -> String {
 }
 
 impl Service {
+    // -- M0 walking-skeleton use cases --------------------------------------
+    //
+    // The minimal, title-first note surface exercised by M0 (HLD note-create
+    // sequence). These compose the same op-log write path as the Phase-1
+    // `notes.*` commands, so every mutation appends to `entity_op` and the
+    // derived tables stay rebuildable from the log (CLAUDE.md op-log invariant).
+
+    /// M0: create a note with an explicit `title` and optional Tiptap `doc_json`
+    /// (defaults to an empty document). In one logical write it allocates a
+    /// UUIDv7 id, appends a `create` op to `entity_op` (the single writer also
+    /// journals the op and reprojects FTS), upserts the note spine + detail,
+    /// projects the body into `block` rows, extracts `link` edges, and emits
+    /// [`AppEvent::NoteSaved`] + [`AppEvent::NoteProjected`]. Returns the note.
+    pub fn create_note(
+        &self,
+        title: impl Into<String>,
+        doc_json: Option<String>,
+    ) -> AppResult<Note> {
+        let title = title.into();
+        let note_id = Id::new();
+        let now = self.now_ms();
+        let doc_json = doc_json.unwrap_or_else(empty_doc);
+
+        let mut doc =
+            notes::Node::from_json(&doc_json).map_err(|e| AppError::Validation(e.to_string()))?;
+        let mut gen = || BlockId::new(util::mint_block_id());
+        let (blocks, links) = notes::validate_and_project(note_id, &mut doc, &mut gen)
+            .map_err(|e| AppError::Validation(e.to_string()))?;
+        let stamped = doc
+            .to_json()
+            .map_err(|e| AppError::Serialization(e.to_string()))?;
+
+        let mut cols = Columns::new();
+        cols.insert("doc_json".into(), Value::String(stamped.clone()));
+        cols.insert(
+            "content_hash".into(),
+            Value::String(util::content_hash(&stamped)),
+        );
+        cols.insert(
+            "word_count".into(),
+            Value::Number(body_word_count(&blocks).into()),
+        );
+        cols.insert("is_pinned".into(), Value::Bool(false));
+
+        let spine_title = normalize_title(Some(title));
+        self.commit(&util::create_op(
+            note_id,
+            self.next_hlc(),
+            "note",
+            spine_title,
+            None,
+            now,
+            Some((DetailTable::Note, cols)),
+        ))?;
+
+        self.write_blocks(note_id, &blocks)?;
+        self.reconcile_projected_links(note_id, &links)?;
+
+        self.emit(AppEvent::NoteSaved {
+            note_id,
+            version: now as u64,
+            changed_block_ids: blocks.iter().map(|b| b.block_id.clone()).collect(),
+        });
+        self.emit(AppEvent::NoteProjected { note_id });
+
+        self.get_note(&note_id.to_string())
+    }
+
+    /// M0: read a note back by id (spine + `doc_json`).
+    pub fn get_note(&self, note_id: &str) -> AppResult<Note> {
+        let id = parse_id(note_id)?;
+        let row = self
+            .read(|c| Ok(read_note(c, id)?))?
+            .ok_or_else(|| AppError::NotFound(format!("note {note_id}")))?;
+        Ok(Note {
+            id: note_id.to_string(),
+            title: row.title,
+            doc_json: row.doc_json,
+            version: row.updated_at,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+        })
+    }
+
+    /// M0: every live note, most-recently-updated first.
+    pub fn list_notes(&self) -> AppResult<Vec<Note>> {
+        let summaries = self.notes_list(None)?;
+        let mut out = Vec::with_capacity(summaries.len());
+        for s in summaries {
+            out.push(self.get_note(&s.id)?);
+        }
+        Ok(out)
+    }
+
+    /// M0: delta-update a note's `title` and/or `doc_json`. Absent fields are
+    /// left unchanged. A body change re-projects blocks + links; the spine op
+    /// bumps `updated_at`. Emits [`AppEvent::NoteSaved`] + [`AppEvent::NoteProjected`].
+    pub fn update_note(
+        &self,
+        note_id: &str,
+        title: Option<String>,
+        doc_json: Option<String>,
+    ) -> AppResult<Note> {
+        let id = parse_id(note_id)?;
+        let now = self.now_ms();
+        let spine = self
+            .read(|c| Ok(util::read_spine(c, id)?))?
+            .ok_or_else(|| AppError::NotFound(format!("note {note_id}")))?;
+        if spine.kind != "note" {
+            return Err(AppError::Validation(format!("{note_id} is not a note")));
+        }
+
+        // Project the new body up front (if supplied) so the spine op and the
+        // derived block/link ops commit as a coherent unit.
+        let mut cols = Columns::new();
+        let mut projected: Option<(Vec<notes::ProjectedBlock>, Vec<notes::ExtractedLink>)> = None;
+        if let Some(doc_json) = doc_json {
+            let mut doc = notes::Node::from_json(&doc_json)
+                .map_err(|e| AppError::Validation(e.to_string()))?;
+            let mut gen = || BlockId::new(util::mint_block_id());
+            let (blocks, links) = notes::validate_and_project(id, &mut doc, &mut gen)
+                .map_err(|e| AppError::Validation(e.to_string()))?;
+            let stamped = doc
+                .to_json()
+                .map_err(|e| AppError::Serialization(e.to_string()))?;
+            cols.insert("doc_json".into(), Value::String(stamped.clone()));
+            cols.insert(
+                "content_hash".into(),
+                Value::String(util::content_hash(&stamped)),
+            );
+            cols.insert(
+                "word_count".into(),
+                Value::Number(body_word_count(&blocks).into()),
+            );
+            projected = Some((blocks, links));
+        }
+
+        let detail = if cols.is_empty() {
+            None
+        } else {
+            Some((DetailTable::Note, cols))
+        };
+        self.commit(&util::update_op(
+            id,
+            self.next_hlc(),
+            &spine,
+            normalize_title(title),
+            now,
+            detail,
+        ))?;
+
+        let changed: Vec<BlockId> = if let Some((blocks, links)) = projected {
+            self.write_blocks(id, &blocks)?;
+            self.reconcile_projected_links(id, &links)?;
+            blocks.iter().map(|b| b.block_id.clone()).collect()
+        } else {
+            Vec::new()
+        };
+
+        self.emit(AppEvent::NoteSaved {
+            note_id: id,
+            version: now as u64,
+            changed_block_ids: changed,
+        });
+        self.emit(AppEvent::NoteProjected { note_id: id });
+
+        self.get_note(note_id)
+    }
+
     /// `notes.create` — seed a note, project its (possibly empty) body, emit events.
     pub fn notes_create(
         &self,
@@ -593,6 +764,14 @@ fn backlink_count(conn: &Connection, target: Id) -> rusqlite::Result<u32> {
         |r| r.get::<_, i64>(0),
     )
     .map(|n| n as u32)
+}
+
+/// Trim a caller-supplied title, collapsing an empty/whitespace string to `None`
+/// so the spine `title` stays `NULL` rather than an empty string.
+fn normalize_title(title: Option<String>) -> Option<String> {
+    title
+        .map(|t| t.trim().to_string())
+        .filter(|t| !t.is_empty())
 }
 
 fn derive_title(blocks: &[notes::ProjectedBlock]) -> Option<String> {

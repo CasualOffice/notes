@@ -11,6 +11,21 @@ use serde::{Deserialize, Serialize};
 // Notes & blocks
 // ---------------------------------------------------------------------------
 
+/// The M0 note aggregate returned by the `create_note` / `get_note` /
+/// `update_note` use cases (HLD note-create sequence): spine identity plus the
+/// source-of-truth `doc_json`. A lean shape distinct from the fuller
+/// [`NoteView`] used by the Phase-1 `notes.*` command surface.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Note {
+    pub id: String,
+    pub title: Option<String>,
+    pub doc_json: String,
+    /// Optimistic-concurrency token (== `entity.updated_at` ms).
+    pub version: i64,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
 /// `notes.get` result: the source-of-truth `doc_json` plus spine/detail meta.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NoteView {

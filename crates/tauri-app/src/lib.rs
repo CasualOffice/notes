@@ -11,19 +11,92 @@
 //! Rust-side via `storage` (direct rusqlite + SQLCipher), composed by `app-service`.
 //!
 //! ## Boot sequence (`setup`)
-//! 1. Resolve the app-data root and open the encrypted [`storage::Store`] (key from
-//!    the OS keystore, with a dev-file fallback for headless boxes).
-//! 2. Build the [`app_service::Service`] over it, installing an [`EventSink`] that
-//!    emits every `SequencedEvent` to the WebView as the single `"app-event"` channel.
+//! 1. Resolve the app-data root and install an [`EventSink`] that emits every
+//!    `SequencedEvent` to the WebView as the single `"app-event"` channel.
+//! 2. [`app_service::Service::open`] provisions the SQLCipher master key (OS
+//!    keystore, dev-file fallback), opens the encrypted store, and builds the
+//!    service — store custody lives in `app-service`, not here.
 //! 3. Replay the op-journal (crash recovery) and register the command surface.
+//! 4. Build the system tray and register the global quick-capture hotkey
+//!    (HLD §8.2). The frameless `quick-capture` window is declared hidden in
+//!    `tauri.conf.json`; the tray and the hotkey toggle its visibility.
 
 mod commands;
 
 use std::sync::Arc;
 
 use app_service::{EventSink, Service};
-use storage::{DevFileKeyStore, KeyMaterial, Paths, StorageResult, Store};
+use storage::Paths;
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
+use tauri::tray::TrayIconBuilder;
 use tauri::{Emitter, Manager};
+use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
+
+/// Window label of the frameless global quick-capture surface (HLD §8.2).
+const QUICK_CAPTURE_LABEL: &str = "quick-capture";
+/// Window label of the primary application window.
+const MAIN_LABEL: &str = "main";
+
+/// The global quick-capture hotkey: `CmdOrCtrl+Shift+Space` (⌘⇧Space on macOS,
+/// Ctrl+Shift+Space elsewhere — HLD §8.2).
+fn quick_capture_shortcut() -> Shortcut {
+    #[cfg(target_os = "macos")]
+    let primary = Modifiers::SUPER;
+    #[cfg(not(target_os = "macos"))]
+    let primary = Modifiers::CONTROL;
+    Shortcut::new(Some(primary | Modifiers::SHIFT), Code::Space)
+}
+
+/// Show + focus a window by label (creating nothing — the window is declared in
+/// config). No-op if the label is unknown.
+fn show_window(app: &tauri::AppHandle, label: &str) {
+    if let Some(win) = app.get_webview_window(label) {
+        let _ = win.show();
+        let _ = win.set_focus();
+    }
+}
+
+/// Toggle the frameless quick-capture window: hide it if already visible+focused,
+/// otherwise center, show, and focus it (HLD §8.2 — "toggle capture window").
+fn toggle_quick_capture(app: &tauri::AppHandle) {
+    let Some(win) = app.get_webview_window(QUICK_CAPTURE_LABEL) else {
+        return;
+    };
+    if win.is_visible().unwrap_or(false) {
+        let _ = win.hide();
+    } else {
+        let _ = win.center();
+        let _ = win.show();
+        let _ = win.set_focus();
+    }
+}
+
+/// Build the tray icon + menu (Open Casual Note / Quick Capture / Quit) and wire
+/// its actions (HLD §4 — window/tray). The icon reuses the app's default window
+/// icon so no extra asset is needed.
+fn build_tray(app: &tauri::App) -> tauri::Result<()> {
+    let open_item = MenuItem::with_id(app, "tray.open", "Open Casual Note", true, None::<&str>)?;
+    let capture_item = MenuItem::with_id(app, "tray.capture", "Quick Capture", true, None::<&str>)?;
+    let sep = PredefinedMenuItem::separator(app)?;
+    let quit_item = MenuItem::with_id(app, "tray.quit", "Quit", true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[&open_item, &capture_item, &sep, &quit_item])?;
+
+    let mut builder = TrayIconBuilder::new()
+        .tooltip("Casual Note")
+        .menu(&menu)
+        .show_menu_on_left_click(true)
+        .on_menu_event(|app, event| match event.id.as_ref() {
+            "tray.open" => show_window(app, MAIN_LABEL),
+            "tray.capture" => toggle_quick_capture(app),
+            "tray.quit" => app.exit(0),
+            _ => {}
+        });
+    if let Some(icon) = app.default_window_icon() {
+        builder = builder.icon(icon.clone());
+    }
+    builder.build(app)?;
+    Ok(())
+}
 
 /// Build and run the Casual Note desktop application (HLD §4 deployment view).
 pub fn run() {
@@ -35,6 +108,20 @@ pub fn run() {
         .init();
 
     tauri::Builder::default()
+        // The global quick-capture hotkey is driven entirely Rust-side; the handler
+        // toggles the frameless capture window (HLD §8.2). The WebView never invokes
+        // the plugin, so no per-window ACL grant is required.
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, shortcut, event| {
+                    if event.state() == ShortcutState::Pressed
+                        && shortcut == &quick_capture_shortcut()
+                    {
+                        toggle_quick_capture(app);
+                    }
+                })
+                .build(),
+        )
         .setup(|app| {
             // macOS: a regular dock app (activation policy). No-op elsewhere.
             #[cfg(target_os = "macos")]
@@ -42,8 +129,6 @@ pub fn run() {
 
             let data_dir = app.path().app_data_dir()?;
             let paths = Paths::new(data_dir);
-            let key = provision_key(&paths)?;
-            let store = Store::open(paths, key)?;
 
             // The single event bus: every derived-fact event → the WebView (HLD §7).
             let handle = app.handle().clone();
@@ -53,13 +138,33 @@ pub fn run() {
                 }
             });
 
-            let service = Service::new(store, "local", sink);
+            // Open the encrypted store (key from the OS keystore, dev-file
+            // fallback) and build the service — key custody lives in app-service.
+            // A failure here is fatal: without the store there is no app, so log a
+            // clear diagnostic and abort setup rather than run a half-open shell.
+            let service = match Service::open(paths, "local", sink) {
+                Ok(s) => s,
+                Err(e) => {
+                    tracing::error!(error = %e, "failed to open the encrypted store; aborting boot");
+                    return Err(Box::new(e) as Box<dyn std::error::Error>);
+                }
+            };
             match service.recover() {
                 Ok(n) if n > 0 => tracing::info!(reapplied = n, "recovered ops from journal"),
                 Ok(_) => {}
                 Err(e) => tracing::warn!(error = %e, "journal recovery failed"),
             }
             app.manage(Arc::new(service));
+
+            // System tray: Open / Quick Capture / Quit (HLD §4).
+            build_tray(app)?;
+
+            // Register the global quick-capture hotkey (HLD §8.2). A failure (e.g.
+            // the combo is already claimed OS-wide) is non-fatal — the tray still
+            // toggles the capture window.
+            if let Err(e) = app.global_shortcut().register(quick_capture_shortcut()) {
+                tracing::warn!(error = %e, "failed to register the quick-capture global shortcut");
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -84,6 +189,7 @@ pub fn run() {
             commands::reminders_upcoming,
             commands::capture_quick,
             commands::nlp_parse,
+            commands::get_capabilities,
             commands::search_query,
             commands::palette_run,
             commands::meeting_preflight,
@@ -99,19 +205,4 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running the Casual Note application");
-}
-
-/// Provision the SQLCipher master key: OS keystore first (Keychain / Credential
-/// Manager / Secret Service), a `0600` dev file beside the DB as a headless
-/// fallback (Data Model §13.1 custody; the fallback warns loudly). `storage`'s
-/// `os-keystore` feature is on by default, so [`storage::KeyringKeyStore`] exists.
-fn provision_key(paths: &Paths) -> StorageResult<KeyMaterial> {
-    match storage::keystore::provision_db_key(&storage::KeyringKeyStore::new()) {
-        Ok(k) => Ok(k),
-        Err(e) => {
-            tracing::warn!(error = %e, "OS keystore unavailable; falling back to dev key file");
-            let dev = DevFileKeyStore::new(paths.root().join(".dev-db-key"));
-            storage::keystore::provision_db_key(&dev)
-        }
-    }
 }

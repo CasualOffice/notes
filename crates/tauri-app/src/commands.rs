@@ -12,7 +12,7 @@
 
 use std::sync::Arc;
 
-use app_domain::{AppError, Bucket, EntityRef};
+use app_domain::{AppError, Bucket, EntityRef, Platform, PlatformCaps};
 use app_service::dto::{
     BacklinkView, BlockView, CaptureResult, LinkResolution, NewReminder, NewTask, NoteSummary,
     NoteView, ReminderView, SaveResult, SearchResultsDto, TaskPatch, TaskView,
@@ -224,6 +224,34 @@ pub fn palette_run(
     input: String,
 ) -> Result<serde_json::Value, AppError> {
     service.palette_run(&mode, &input)
+}
+
+// --- System / capabilities -------------------------------------------------
+
+/// Honest per-platform capability report (HLD §9, `CapabilityReport`). Pure and
+/// side-effect-free: the WebView calls this once on boot so it never exposes a
+/// capability the host lacks (e.g. Linux has no OS reminder-scheduling layer).
+#[tauri::command]
+pub fn get_capabilities() -> Result<PlatformCaps, AppError> {
+    Ok(platform_caps())
+}
+
+/// The compile-target's honest capabilities. M0 ships no meeting-audio adapter, so
+/// audio caps are `false` everywhere; reminder layering follows the platform (Linux
+/// is running-only — HLD §9.3).
+pub(crate) fn platform_caps() -> PlatformCaps {
+    // `Platform::current()` is `None` only on unsupported targets; the desktop
+    // binary only ever builds for one of the three, so fall back to Linux (the
+    // most conservative capability profile) rather than panic.
+    let platform = Platform::current().unwrap_or(Platform::Linux);
+    let has_os_reminder_layer = matches!(platform, Platform::Macos | Platform::Windows);
+    PlatformCaps {
+        platform,
+        app_audio_capture: false,
+        exclude_self: false,
+        reminder_os_layer: has_os_reminder_layer,
+        reminder_running_only: !has_os_reminder_layer,
+    }
 }
 
 // --- Later-phase stubs (typed "not implemented in this phase") --------------

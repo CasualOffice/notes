@@ -5,164 +5,114 @@
  * sees SQL, raw filesystem paths, or PCM. It talks to the Rust core only through
  * `invoke(cmd, args)` (HLD §6) and reconciles state from `AppEvent`s (HLD §7).
  *
- * Phase-1 proves the round-trip end to end: a Tiptap editor bound to `notes.save`,
- * a task list driven by `tasks.bucket`/`tasks.complete`, and a quick-capture input
- * calling `capture.quick` (NLP-routed).
+ * M0 Notes experience: a two-pane view — the notebook list on the left, a Tiptap
+ * editor with debounced autosave on the right — plus intent-routed quick capture.
+ * When run outside Tauri (`pnpm dev` in a browser) the IPC layer serves an
+ * in-memory sample store so the whole app renders for preview.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Editor } from "./features/editor/Editor";
-import { api, onAppEvent, type AppEventEnvelope, type TaskView } from "./lib/api";
+import { NoteList } from "./features/notebooks/NoteList";
+import { QuickCapture } from "./features/quick-capture/QuickCapture";
+import { api, isTauri, onAppEvent, type NoteSummary } from "./lib/api";
+
+const NOTE_EVENTS = new Set(["NoteSaved", "NoteProjected"]);
 
 export function App(): React.JSX.Element {
-  const [noteId, setNoteId] = useState<string | null>(null);
-  const [tasks, setTasks] = useState<TaskView[]>([]);
-  const [capture, setCapture] = useState<string>("");
-  const [newTask, setNewTask] = useState<string>("");
-  const [events, setEvents] = useState<AppEventEnvelope[]>([]);
+  const [notes, setNotes] = useState<NoteSummary[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState<string>("");
   const booted = useRef<boolean>(false);
 
-  const refreshTasks = useCallback(async (): Promise<void> => {
-    try {
-      setTasks(await api.tasksBucket("Anytime"));
-    } catch (e: unknown) {
-      setError(String(e));
-    }
+  const refreshNotes = useCallback(async (): Promise<NoteSummary[]> => {
+    const list = await api.notesList();
+    setNotes(list);
+    return list;
   }, []);
 
-  // Boot: pick an existing note or create one, then load tasks.
+  const select = useCallback((id: string): void => {
+    setSelectedId(id);
+  }, []);
+
+  // Boot: load the note list and open the most recent (or create the first note).
   useEffect(() => {
     if (booted.current) return;
     booted.current = true;
     void (async () => {
       try {
-        const list = await api.notesList();
-        const id = list[0]?.id ?? (await api.notesCreate());
-        setNoteId(id);
-        await refreshTasks();
+        const list = await refreshNotes();
+        const first = list[0]?.id ?? (await api.notesCreate());
+        if (!list[0]) await refreshNotes();
+        select(first);
       } catch (e: unknown) {
         setError(String(e));
       }
     })();
-  }, [refreshTasks]);
+  }, [refreshNotes, select]);
 
-  // Subscribe to the single core→WebView event channel (HLD §7).
+  // Reconcile from the single core→WebView event channel (HLD §7): any note
+  // mutation re-fetches the summary list so titles/order stay live.
   useEffect(() => {
     const unlisten = onAppEvent((ev) => {
-      setEvents((prev) => [ev, ...prev].slice(0, 12));
+      if (NOTE_EVENTS.has(ev.type)) void refreshNotes().catch(() => undefined);
     });
     return () => {
       void unlisten.then((fn) => fn());
     };
-  }, []);
+  }, [refreshNotes]);
 
-  const doCapture = async (): Promise<void> => {
-    const text = capture.trim();
-    if (!text) return;
+  const createNote = useCallback(async (): Promise<void> => {
     try {
-      await api.captureQuick(text);
-      setCapture("");
-      await refreshTasks();
+      const id = await api.notesCreate();
+      await refreshNotes();
+      select(id);
     } catch (e: unknown) {
       setError(String(e));
     }
-  };
-
-  const addTask = async (): Promise<void> => {
-    const title = newTask.trim();
-    if (!title) return;
-    try {
-      await api.tasksCreate(title);
-      setNewTask("");
-      await refreshTasks();
-    } catch (e: unknown) {
-      setError(String(e));
-    }
-  };
-
-  const complete = async (id: string): Promise<void> => {
-    try {
-      await api.tasksComplete(id);
-      await refreshTasks();
-    } catch (e: unknown) {
-      setError(String(e));
-    }
-  };
+  }, [refreshNotes, select]);
 
   return (
-    <main style={{ maxWidth: 960, margin: "0 auto", padding: 24, fontFamily: "system-ui" }}>
-      <h1 style={{ fontSize: 22 }}>Casual Note</h1>
+    <div className="app">
+      <header className="topbar">
+        <div className="brand">
+          <span className="brand-mark">Casual Note</span>
+          <span className="brand-sub">Notes</span>
+        </div>
+        <QuickCapture
+          onCaptured={(r) => {
+            void refreshNotes().catch(() => undefined);
+            if (r.entity_ref.kind === "note") select(r.entity_ref.id);
+          }}
+        />
+        <span className="mode-pill">{isTauri ? "Local store" : "Preview (sample data)"}</span>
+      </header>
+
       {error && (
-        <p style={{ color: "crimson", fontSize: 13 }} role="alert">
+        <div className="error-banner" role="alert">
           {error}
-        </p>
+        </div>
       )}
 
-      <section style={{ margin: "12px 0" }}>
-        <label htmlFor="capture" style={{ fontSize: 13, fontWeight: 600 }}>
-          Quick capture (NLP-routed → task / note / reminder)
-        </label>
-        <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-          <input
-            id="capture"
-            value={capture}
-            placeholder='e.g. "call Sam tomorrow 3pm #work !2"'
-            onChange={(e) => setCapture(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") void doCapture();
-            }}
-            style={{ flex: 1, padding: 6 }}
-          />
-          <button type="button" onClick={() => void doCapture()}>
-            Capture
-          </button>
-        </div>
-      </section>
-
-      {noteId ? <Editor noteId={noteId} /> : <p>Preparing note…</p>}
-
-      <section style={{ marginTop: 16, border: "1px solid #ccc", borderRadius: 8, padding: 12 }}>
-        <h2 style={{ margin: 0, fontSize: 16 }}>Tasks · Anytime</h2>
-        <div style={{ display: "flex", gap: 8, margin: "8px 0" }}>
-          <input
-            value={newTask}
-            placeholder="New task title"
-            onChange={(e) => setNewTask(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") void addTask();
-            }}
-            style={{ flex: 1, padding: 6 }}
-          />
-          <button type="button" onClick={() => void addTask()}>
-            Add
-          </button>
-        </div>
-        <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-          {tasks.map((t) => (
-            <li
-              key={t.id}
-              style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}
-            >
-              <span>{t.title ?? "(untitled)"}</span>
-              <button type="button" onClick={() => void complete(t.id)}>
-                Complete
+      <div className="workspace">
+        <NoteList
+          notes={notes}
+          selectedId={selectedId}
+          onSelect={select}
+          onCreate={() => void createNote()}
+        />
+        {selectedId ? (
+          <Editor key={selectedId} noteId={selectedId} />
+        ) : (
+          <div className="editor-pane">
+            <div className="editor-empty">
+              <p>Select a note, or create a new one to start writing.</p>
+              <button type="button" className="btn btn-accent" onClick={() => void createNote()}>
+                New note
               </button>
-            </li>
-          ))}
-          {tasks.length === 0 && <li style={{ opacity: 0.6 }}>No tasks yet.</li>}
-        </ul>
-      </section>
-
-      <section style={{ marginTop: 16 }}>
-        <h2 style={{ fontSize: 13, opacity: 0.7 }}>AppEvents (live)</h2>
-        <ul style={{ fontSize: 12, fontFamily: "monospace", opacity: 0.75 }}>
-          {events.map((ev) => (
-            <li key={ev.seq}>
-              #{ev.seq} {ev.type}
-            </li>
-          ))}
-        </ul>
-      </section>
-    </main>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
