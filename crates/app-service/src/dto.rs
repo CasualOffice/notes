@@ -92,6 +92,51 @@ pub struct LinkResolution {
 }
 
 // ---------------------------------------------------------------------------
+// Notebooks / folder tree (M1)
+// ---------------------------------------------------------------------------
+
+/// One node in the `notebooks.list` tree (Data Model §4.3). A notebook is a spine
+/// entity (`kind='notebook'`); `children` are its live sub-notebooks, recursively.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct NotebookNode {
+    pub id: String,
+    /// The notebook's display name (spine `title`).
+    pub name: Option<String>,
+    pub parent_id: Option<String>,
+    pub order_key: String,
+    pub icon: Option<String>,
+    pub color: Option<String>,
+    pub children: Vec<NotebookNode>,
+}
+
+// ---------------------------------------------------------------------------
+// Backlinks (M1 `links.backlinks` / `links.unlinked_mentions`)
+// ---------------------------------------------------------------------------
+
+/// A resolved reverse reference to a target entity — the "Linked mentions" panel
+/// row (Feature Specs §1.2). Derived-on-read from `link`; never materialized.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct BacklinkRef {
+    pub source_note_id: String,
+    pub source_title: Option<String>,
+    /// The precise origin block (`link.src_block_id`), for the jump affordance.
+    pub block_id: Option<String>,
+    /// The surrounding block text, truncated for the panel.
+    pub snippet: String,
+}
+
+/// An "unlinked mention" — a note whose text matches the target's title via FTS but
+/// that carries no `wikilink`/`mention` edge to it yet (Feature Specs §1.2). Surfaced
+/// live, never stored.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct UnlinkedMention {
+    pub source_note_id: String,
+    pub source_title: Option<String>,
+    /// A snippet of the matching note's body around the title occurrence.
+    pub snippet: String,
+}
+
+// ---------------------------------------------------------------------------
 // Tasks / projects / areas
 // ---------------------------------------------------------------------------
 

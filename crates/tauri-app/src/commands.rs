@@ -14,8 +14,9 @@ use std::sync::Arc;
 
 use app_domain::{AppError, Bucket, EntityRef, Platform, PlatformCaps};
 use app_service::dto::{
-    BacklinkView, BlockView, CaptureResult, LinkResolution, NewReminder, NewTask, NoteSummary,
-    NoteView, ReminderView, SaveResult, SearchResultsDto, TaskPatch, TaskView,
+    BacklinkRef, BacklinkView, BlockView, CaptureResult, LinkResolution, NewReminder, NewTask,
+    Note, NoteSummary, NoteView, NotebookNode, ReminderView, SaveResult, SearchResultsDto,
+    TaskPatch, TaskView, UnlinkedMention,
 };
 use app_service::{stubs, ParsedEntry, Service};
 use tauri::State;
@@ -86,6 +87,78 @@ pub fn blocks_backlinks(
     target: EntityRef,
 ) -> Result<Vec<BacklinkView>, AppError> {
     service.blocks_backlinks(target)
+}
+
+// --- Notebooks / folder tree (M1) ------------------------------------------
+
+#[tauri::command]
+pub fn notebooks_list(service: State<'_, Arc<Service>>) -> Result<Vec<NotebookNode>, AppError> {
+    service.notebooks_list()
+}
+
+#[tauri::command]
+pub fn notebooks_create(
+    service: State<'_, Arc<Service>>,
+    name: String,
+    parent_id: Option<String>,
+) -> Result<String, AppError> {
+    service.notebooks_create(name, parent_id)
+}
+
+#[tauri::command]
+pub fn notes_move(
+    service: State<'_, Arc<Service>>,
+    note_id: String,
+    notebook_id: Option<String>,
+) -> Result<NoteView, AppError> {
+    service.notes_move(&note_id, notebook_id)
+}
+
+// --- Daily notes (M1) ------------------------------------------------------
+
+#[tauri::command]
+pub fn daily_get_or_create(
+    service: State<'_, Arc<Service>>,
+    date: String,
+) -> Result<Note, AppError> {
+    service.daily_get_or_create(&date)
+}
+
+// --- Backlinks (M1) --------------------------------------------------------
+
+#[tauri::command]
+pub fn links_backlinks(
+    service: State<'_, Arc<Service>>,
+    entity_id: String,
+) -> Result<Vec<BacklinkRef>, AppError> {
+    service.links_backlinks(&entity_id)
+}
+
+#[tauri::command]
+pub fn links_unlinked_mentions(
+    service: State<'_, Arc<Service>>,
+    entity_id: String,
+) -> Result<Vec<UnlinkedMention>, AppError> {
+    service.links_unlinked_mentions(&entity_id)
+}
+
+// --- Markdown I/O (M1) -----------------------------------------------------
+
+#[tauri::command]
+pub fn notes_export_markdown(
+    service: State<'_, Arc<Service>>,
+    note_id: String,
+) -> Result<String, AppError> {
+    service.notes_export_markdown(&note_id)
+}
+
+#[tauri::command]
+pub fn notes_import_markdown(
+    service: State<'_, Arc<Service>>,
+    md: String,
+    notebook_id: Option<String>,
+) -> Result<Note, AppError> {
+    service.notes_import_markdown(&md, notebook_id)
 }
 
 // --- Tasks / projects / areas ----------------------------------------------

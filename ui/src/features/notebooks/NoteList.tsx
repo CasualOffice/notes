@@ -26,7 +26,7 @@ interface Props {
 
 export function NoteList({ notes, selectedId, onSelect, onCreate }: Props): React.JSX.Element {
   return (
-    <aside className="sidebar">
+    <div className="notes-section">
       <div className="sidebar-head">
         <span className="sidebar-title">Notes</span>
         <button type="button" className="btn btn-ghost" onClick={onCreate}>
@@ -54,6 +54,6 @@ export function NoteList({ notes, selectedId, onSelect, onCreate }: Props): Reac
           ))}
         </ul>
       )}
-    </aside>
+    </div>
   );
 }

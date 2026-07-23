@@ -20,6 +20,7 @@
 
 pub mod capture;
 pub mod dto;
+pub mod notebooks;
 pub mod notes;
 pub mod reminders;
 pub mod search;
@@ -153,5 +154,92 @@ pub fn provision_master_key(paths: &Paths) -> AppResult<KeyMaterial> {
             let dev = DevFileKeyStore::new(paths.root().join(".dev-db-key"));
             Ok(storage::keystore::provision_db_key(&dev)?)
         }
+    }
+}
+
+#[cfg(test)]
+mod m1_tests {
+    use super::*;
+    use app_domain::Id;
+    use storage::{Paths, Store};
+
+    /// A service over a throwaway in-memory store (real op-log + FTS projection),
+    /// with a discarding event sink.
+    fn svc() -> Service {
+        let dir = std::env::temp_dir().join(format!("cn-svc-{}", Id::new()));
+        let store = Store::open_memory(Paths::new(dir)).expect("open_memory");
+        let sink: EventSink = Box::new(|_| {});
+        Service::new(store, "test", sink)
+    }
+
+    #[test]
+    fn daily_get_or_create_is_idempotent() {
+        let s = svc();
+        let a = s.daily_get_or_create("2026-07-23").unwrap();
+        let b = s.daily_get_or_create("2026-07-23").unwrap();
+        assert_eq!(a.id, b.id, "second call returns the same daily note");
+        assert_eq!(a.title.as_deref(), Some("2026-07-23"));
+
+        let dailies = s
+            .notes_list(None)
+            .unwrap()
+            .into_iter()
+            .filter(|n| n.daily_date.as_deref() == Some("2026-07-23"))
+            .count();
+        assert_eq!(dailies, 1, "exactly one live note per local date");
+
+        assert!(s.daily_get_or_create("not-a-date").is_err());
+    }
+
+    #[test]
+    fn backlinks_resolve_after_linking_two_notes() {
+        let s = svc();
+        let target = s.create_note("Target", None).unwrap();
+        // A source note that references [[Target]] resolves to the existing note.
+        let source = s
+            .notes_import_markdown("See [[Target]] for context.", None)
+            .unwrap();
+
+        let back = s.links_backlinks(&target.id).unwrap();
+        assert_eq!(back.len(), 1, "one wikilink backlink to Target");
+        assert_eq!(back[0].source_note_id, source.id);
+        assert!(back[0].snippet.contains("Target"));
+    }
+
+    #[test]
+    fn markdown_round_trips_through_store() {
+        let s = svc();
+        let md = "# Title\n\nA paragraph with a [[Foo]] link and a #Work tag.";
+        let note = s.notes_import_markdown(md, None).unwrap();
+        let out = s.notes_export_markdown(&note.id).unwrap();
+        assert_eq!(out, md, "import → export round-trips the Markdown");
+    }
+
+    #[test]
+    fn notebooks_create_list_and_move() {
+        let s = svc();
+        let root = s.notebooks_create("Root".into(), None).unwrap();
+        let child = s
+            .notebooks_create("Child".into(), Some(root.clone()))
+            .unwrap();
+
+        let tree = s.notebooks_list().unwrap();
+        assert_eq!(tree.len(), 1, "one root notebook");
+        assert_eq!(tree[0].id, root);
+        assert_eq!(tree[0].name.as_deref(), Some("Root"));
+        assert_eq!(tree[0].children.len(), 1, "Child nested under Root");
+        assert_eq!(tree[0].children[0].id, child);
+
+        // A note filed into the notebook, then cleared back to the top level.
+        let note = s.create_note("N", None).unwrap();
+        let moved = s.notes_move(&note.id, Some(root.clone())).unwrap();
+        assert_eq!(moved.notebook_id.as_deref(), Some(root.as_str()));
+        let cleared = s.notes_move(&note.id, None).unwrap();
+        assert_eq!(cleared.notebook_id, None, "notebook_id cleared to NULL");
+
+        // A non-notebook parent is rejected.
+        assert!(s
+            .notebooks_create("Bad".into(), Some(note.id.clone()))
+            .is_err());
     }
 }

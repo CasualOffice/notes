@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "quick-capture",
-  "description": "Deny-by-default baseline for the frameless quick-capture window (HLD §8.2): only command invocation and the AppEvent channel are granted, matching the main window. The global shortcut that toggles this window is registered Rust-side, so no `global-shortcut` JS permission is granted here. Feature permissions are added explicitly as the corresponding HLD §6 commands land — never broadly. See Architecture §9/§12.",
+  "description": "Deny-by-default baseline for the frameless quick-capture window (HLD §8.2): command invocation, the AppEvent channel, and self-hide only. The window is pre-created hidden and toggled Rust-side by the tray/global hotkey; `core:window:allow-hide` lets its WebView dismiss itself on submit/Escape (hide, never close, so it stays reusable). The global shortcut is registered Rust-side, so no `global-shortcut` JS permission is granted here. Feature permissions are added explicitly as the corresponding HLD §6 commands land — never broadly. See Architecture §9/§12.",
   "local": true,
   "windows": ["quick-capture"],
-  "permissions": ["core:default", "core:event:default"]
+  "permissions": ["core:default", "core:event:default", "core:window:allow-hide"]
 }

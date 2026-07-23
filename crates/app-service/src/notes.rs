@@ -8,7 +8,8 @@ use serde_json::Value;
 use storage::{BlockRow, DetailTable, LinkRow, OpBody};
 
 use crate::dto::{
-    BacklinkView, BlockView, LinkResolution, Note, NoteSummary, NoteView, SaveResult,
+    BacklinkRef, BacklinkView, BlockView, LinkResolution, Note, NoteSummary, NoteView, SaveResult,
+    UnlinkedMention,
 };
 use crate::util::{self, Columns};
 use crate::Service;
@@ -710,9 +711,283 @@ impl Service {
     }
 }
 
+// ===========================================================================
+// M1 use cases: daily notes, backlinks (with snippets), Markdown I/O
+// ===========================================================================
+
+impl Service {
+    /// `daily.get_or_create` — the daily note keyed by `entity.daily_date =`
+    /// `<local date>` (Feature Specs §1.4). Returns the existing note for `date`
+    /// or, on miss, creates one titled by the date with `daily_date` set. The
+    /// get path commits nothing (idempotent); only a miss appends ops.
+    pub fn daily_get_or_create(&self, date: &str) -> AppResult<Note> {
+        // Validate the local wall-date shape up front (`YYYY-MM-DD`).
+        chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d")
+            .map_err(|_| AppError::Validation(format!("invalid daily date '{date}'")))?;
+
+        if let Some(id) = self.read(|c| Ok(find_daily(c, date)?))? {
+            return self.get_note(&id.to_string());
+        }
+
+        // Miss: seed an empty daily note carrying `daily_date` on spine + detail.
+        let note_id = Id::new();
+        let now = self.now_ms();
+        let doc_json = empty_doc();
+        let mut doc =
+            notes::Node::from_json(&doc_json).map_err(|e| AppError::Validation(e.to_string()))?;
+        let mut gen = || BlockId::new(util::mint_block_id());
+        let (blocks, links) = notes::validate_and_project(note_id, &mut doc, &mut gen)
+            .map_err(|e| AppError::Validation(e.to_string()))?;
+        let stamped = doc
+            .to_json()
+            .map_err(|e| AppError::Serialization(e.to_string()))?;
+
+        let mut cols = Columns::new();
+        cols.insert("doc_json".into(), Value::String(stamped.clone()));
+        cols.insert(
+            "content_hash".into(),
+            Value::String(util::content_hash(&stamped)),
+        );
+        cols.insert(
+            "word_count".into(),
+            Value::Number(body_word_count(&blocks).into()),
+        );
+        cols.insert("is_pinned".into(), Value::Bool(false));
+        cols.insert("daily_date".into(), Value::String(date.to_string()));
+
+        self.commit(&util::create_op(
+            note_id,
+            self.next_hlc(),
+            "note",
+            Some(date.to_string()),
+            Some(date.to_string()),
+            now,
+            Some((DetailTable::Note, cols)),
+        ))?;
+
+        self.write_blocks(note_id, &blocks)?;
+        self.reconcile_projected_links(note_id, &links)?;
+
+        self.emit(AppEvent::NoteSaved {
+            note_id,
+            version: now as u64,
+            changed_block_ids: blocks.iter().map(|b| b.block_id.clone()).collect(),
+        });
+        self.emit(AppEvent::NoteProjected { note_id });
+
+        self.get_note(&note_id.to_string())
+    }
+
+    /// `links.backlinks` — the target's "Linked mentions" (resolved `[[wiki]]` /
+    /// `@mention` edges pointing at it), each enriched with the source note title
+    /// and a snippet of the referencing block (Feature Specs §1.2). Derived-on-read.
+    pub fn links_backlinks(&self, entity_id: &str) -> AppResult<Vec<BacklinkRef>> {
+        let id = parse_id(entity_id)?;
+        self.read(|c| {
+            let rows = links::backlinks(c, id)
+                .map_err(|e| storage::StorageError::Invariant(e.to_string()))?;
+            let mut out = Vec::with_capacity(rows.len());
+            for b in rows {
+                let title: Option<String> = c
+                    .query_row(
+                        "SELECT title FROM entity WHERE id = ?1",
+                        params![b.src_entity.as_bytes().as_slice()],
+                        |r| r.get::<_, Option<String>>(0),
+                    )
+                    .optional()?
+                    .flatten();
+                let snippet = match &b.src_block_id {
+                    Some(bid) => block_text(c, b.src_entity, bid)?.unwrap_or_default(),
+                    None => String::new(),
+                };
+                out.push(BacklinkRef {
+                    source_note_id: b.src_entity.to_string(),
+                    source_title: title,
+                    block_id: b.src_block_id.clone(),
+                    snippet: truncate_snippet(&snippet, 160),
+                });
+            }
+            Ok(out)
+        })
+    }
+
+    /// `links.unlinked_mentions` — notes whose text matches the target's title via
+    /// FTS but that carry no edge to it yet (Feature Specs §1.2). Surfaced live.
+    pub fn links_unlinked_mentions(&self, entity_id: &str) -> AppResult<Vec<UnlinkedMention>> {
+        let id = parse_id(entity_id)?;
+        let title: Option<String> = self.read(|c| {
+            Ok(c.query_row(
+                "SELECT title FROM entity WHERE id = ?1 AND deleted_at IS NULL",
+                params![id.as_bytes().as_slice()],
+                |r| r.get::<_, Option<String>>(0),
+            )
+            .optional()?
+            .flatten())
+        })?;
+        let Some(title) = title else {
+            return Ok(Vec::new());
+        };
+        if title.trim().is_empty() {
+            return Ok(Vec::new());
+        }
+        let fts_match = fts_phrase(&title);
+        self.read(move |c| {
+            let ids = links::unlinked_mentions(c, id, &fts_match)
+                .map_err(|e| storage::StorageError::Invariant(e.to_string()))?;
+            let mut out = Vec::with_capacity(ids.len());
+            for src in ids {
+                let src_title: Option<String> = c
+                    .query_row(
+                        "SELECT title FROM entity WHERE id = ?1",
+                        params![src.as_bytes().as_slice()],
+                        |r| r.get::<_, Option<String>>(0),
+                    )
+                    .optional()?
+                    .flatten();
+                let snippet = first_block_text(c, src)?
+                    .filter(|s| !s.trim().is_empty())
+                    .or_else(|| src_title.clone())
+                    .unwrap_or_default();
+                out.push(UnlinkedMention {
+                    source_note_id: src.to_string(),
+                    source_title: src_title,
+                    snippet: truncate_snippet(&snippet, 160),
+                });
+            }
+            Ok(out)
+        })
+    }
+
+    /// `notes.export_markdown` — render a note's `doc_json` to CommonMark+GFM
+    /// (Data Model §15.1, Feature Specs §8.1), preserving `[[wikilink]]`/`#tag`/
+    /// `@mention` inline forms so a re-import round-trips.
+    pub fn notes_export_markdown(&self, note_id: &str) -> AppResult<String> {
+        let id = parse_id(note_id)?;
+        let row = self
+            .read(|c| Ok(read_note(c, id)?))?
+            .ok_or_else(|| AppError::NotFound(format!("note {note_id}")))?;
+        let doc = notes::Node::from_json(&row.doc_json)
+            .map_err(|e| AppError::Validation(e.to_string()))?;
+        Ok(notes::to_markdown(&doc))
+    }
+
+    /// `notes.import_markdown` — parse Markdown into a fresh note: mint blockIds,
+    /// project blocks, extract + resolve links, optionally file it under
+    /// `notebook_id`. Import never overwrites — it always creates a new entity
+    /// (Feature Specs §8.1). Returns the created note.
+    pub fn notes_import_markdown(&self, md: &str, notebook_id: Option<String>) -> AppResult<Note> {
+        let note_id = Id::new();
+        let now = self.now_ms();
+
+        let mut doc = notes::from_markdown(md);
+        let mut gen = || BlockId::new(util::mint_block_id());
+        let (blocks, links) = notes::validate_and_project(note_id, &mut doc, &mut gen)
+            .map_err(|e| AppError::Validation(e.to_string()))?;
+        let stamped = doc
+            .to_json()
+            .map_err(|e| AppError::Serialization(e.to_string()))?;
+        let title = derive_title(&blocks);
+
+        let mut cols = Columns::new();
+        cols.insert("doc_json".into(), Value::String(stamped.clone()));
+        cols.insert(
+            "content_hash".into(),
+            Value::String(util::content_hash(&stamped)),
+        );
+        cols.insert(
+            "word_count".into(),
+            Value::Number(body_word_count(&blocks).into()),
+        );
+        cols.insert("is_pinned".into(), Value::Bool(false));
+        if let Some(nb) = &notebook_id {
+            let nbid = parse_id(nb)?;
+            let nb_spine = self
+                .read(|c| Ok(util::read_spine(c, nbid)?))?
+                .ok_or_else(|| AppError::NotFound(format!("notebook {nb}")))?;
+            if nb_spine.kind != "notebook" {
+                return Err(AppError::Validation(format!("{nb} is not a notebook")));
+            }
+            cols.insert("notebook_id".into(), Value::String(nbid.to_string()));
+        }
+
+        self.commit(&util::create_op(
+            note_id,
+            self.next_hlc(),
+            "note",
+            title,
+            None,
+            now,
+            Some((DetailTable::Note, cols)),
+        ))?;
+
+        self.write_blocks(note_id, &blocks)?;
+        self.reconcile_projected_links(note_id, &links)?;
+
+        self.emit(AppEvent::NoteSaved {
+            note_id,
+            version: now as u64,
+            changed_block_ids: blocks.iter().map(|b| b.block_id.clone()).collect(),
+        });
+        self.emit(AppEvent::NoteProjected { note_id });
+
+        self.get_note(&note_id.to_string())
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Small read helpers + conversions
 // ---------------------------------------------------------------------------
+
+/// Find the live daily note for a local `date` (`YYYY-MM-DD`), if one exists.
+fn find_daily(conn: &Connection, date: &str) -> rusqlite::Result<Option<Id>> {
+    conn.query_row(
+        "SELECT e.id FROM note n JOIN entity e ON e.id = n.entity_id \
+         WHERE n.daily_date = ?1 AND e.deleted_at IS NULL LIMIT 1",
+        params![date],
+        |r| r.get::<_, Vec<u8>>(0),
+    )
+    .optional()
+    .map(|o| o.map(|b| Id::from_bytes(to16(&b))))
+}
+
+/// The text of one projected block (for a backlink snippet).
+fn block_text(conn: &Connection, note_id: Id, block_id: &str) -> rusqlite::Result<Option<String>> {
+    conn.query_row(
+        "SELECT text_content FROM block WHERE note_id = ?1 AND block_id = ?2",
+        params![note_id.as_bytes().as_slice(), block_id],
+        |r| r.get::<_, Option<String>>(0),
+    )
+    .optional()
+    .map(|o| o.flatten())
+}
+
+/// The first block's text of a note (for an unlinked-mention snippet).
+fn first_block_text(conn: &Connection, note_id: Id) -> rusqlite::Result<Option<String>> {
+    conn.query_row(
+        "SELECT text_content FROM block WHERE note_id = ?1 ORDER BY seq LIMIT 1",
+        params![note_id.as_bytes().as_slice()],
+        |r| r.get::<_, Option<String>>(0),
+    )
+    .optional()
+    .map(|o| o.flatten())
+}
+
+/// Quote a title as an FTS5 phrase (embedded `"` doubled), so multi-word titles
+/// match as a phrase rather than as independent OR terms.
+fn fts_phrase(title: &str) -> String {
+    format!("\"{}\"", title.replace('"', "\"\""))
+}
+
+/// Trim + cap a snippet to `max` characters, appending an ellipsis on truncation.
+fn truncate_snippet(text: &str, max: usize) -> String {
+    let t = text.trim();
+    if t.chars().count() <= max {
+        t.to_string()
+    } else {
+        let head: String = t.chars().take(max).collect();
+        format!("{head}...")
+    }
+}
 
 fn find_tag(conn: &Connection, name: &str) -> rusqlite::Result<Option<Id>> {
     conn.query_row(
