@@ -239,6 +239,7 @@ mod tests {
             size_bytes: len,
             url: "http://x/model".into(),
             min_hardware: HardwareRequirements::none(),
+            languages: crate::manifest::LanguageSupport::Multilingual,
             signature: "sig".into(),
         };
         (p, manifest)

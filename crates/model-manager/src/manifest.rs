@@ -35,6 +35,59 @@ pub enum ModelEngine {
     Reranker,
 }
 
+/// Which natural languages a model handles (Architecture §8 — language-aware
+/// selection). STT and embedders come in multilingual and language-specialized
+/// variants (e.g. Whisper `small` is multilingual, `small.en` is English-only and
+/// faster/better for English); most instruct LLMs are broadly multilingual. The
+/// registry uses this to pick and download the right pack for the *user's own
+/// language* (see [`crate::select`]).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LanguageSupport {
+    /// Handles many languages with auto-detection (multilingual Whisper, Qwen3,
+    /// bge-m3, …). The safe default.
+    Multilingual,
+    /// Specialized to a fixed set of BCP-47 primary subtags, e.g. `["en"]` for a
+    /// Whisper `*.en` model. Preferred over a multilingual model *when it covers
+    /// the user's language* because it is smaller/faster/more accurate there.
+    Only(Vec<String>),
+}
+
+impl LanguageSupport {
+    /// Whether this model can serve `lang` (a BCP-47 tag; matched on the primary
+    /// subtag, so `en-US` matches `en`).
+    #[must_use]
+    pub fn supports(&self, lang: &str) -> bool {
+        match self {
+            Self::Multilingual => true,
+            Self::Only(tags) => tags
+                .iter()
+                .any(|t| primary_subtag(t) == primary_subtag(lang)),
+        }
+    }
+
+    /// True for the broad multilingual variant.
+    #[must_use]
+    pub const fn is_multilingual(&self) -> bool {
+        matches!(self, Self::Multilingual)
+    }
+}
+
+/// The lowercase primary language subtag of a BCP-47 tag (`en-US` → `en`).
+#[must_use]
+pub fn primary_subtag(tag: &str) -> String {
+    tag.split(['-', '_'])
+        .next()
+        .unwrap_or("")
+        .to_ascii_lowercase()
+}
+
+/// Default when a manifest omits `languages`: assume multilingual (safe — never
+/// wrongly excludes a user's language).
+fn default_language_support() -> LanguageSupport {
+    LanguageSupport::Multilingual
+}
+
 /// Minimum hardware a model needs to run acceptably (Architecture §8 tier probe).
 ///
 /// `min_ram_bytes` gates load; `min_tier` is the coarse recommendation bucket the
@@ -94,6 +147,10 @@ pub struct ModelManifest {
     /// Minimum hardware / compatibility floor.
     #[serde(default = "HardwareRequirements::none")]
     pub min_hardware: HardwareRequirements,
+    /// Which natural languages this model serves. Defaults to multilingual when
+    /// omitted; drives language-aware selection ([`crate::select`]).
+    #[serde(default = "default_language_support")]
+    pub languages: LanguageSupport,
     /// Detached signature over [`signing_payload`](Self::signing_payload), as hex
     /// or base64 depending on the (future) scheme. Persisted to
     /// `model_installation.manifest_sig`.
@@ -114,6 +171,7 @@ struct SigningPayload<'a> {
     size_bytes: u64,
     url: &'a str,
     min_hardware: &'a HardwareRequirements,
+    languages: &'a LanguageSupport,
 }
 
 impl ModelManifest {
@@ -146,6 +204,7 @@ impl ModelManifest {
             size_bytes: self.size_bytes,
             url: &self.url,
             min_hardware: &self.min_hardware,
+            languages: &self.languages,
         };
         Ok(serde_json::to_vec(&payload)?)
     }

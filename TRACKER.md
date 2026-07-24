@@ -87,7 +87,7 @@ _**M0 and M1 are DONE**, verified green via `./scripts/ci-local.sh`. Phase-2 eng
 - [~] W7 LLM & artifacts: `llm-api` trait + **MeetingArtifactV1 / AnswerV1 types** done; llama.cpp FFI + GBNF-constrained decode + repair→fallback pending
 - [x] W10 Session state machine `NEW→…→COMPLETE` (+DEGRADED/FAILED/RECOVERING); INDEXING writes spine+FTS+links _(coordinator + Tauri `meeting.*` commands + Meetings UI; runs on mock engines)_
 - [x] Cross-pillar bridge: action-item → Task (`spawned_from` + evidence); meeting-as-note
-- [x] W9 Model manager: signed manifests, SHA-256 verify, disk preflight, offline import, hardware-tier select (resumable HTTP downloader behind a trait; real network impl deferred)
+- [x] W9 Model manager: signed manifests, SHA-256 verify, disk preflight, offline import, **hardware-tier × language-aware selection** (`select_pack` — Whisper `.en` for English, multilingual otherwise; on-demand per-language download) (resumable HTTP downloader behind a trait; real network impl deferred)
 - [ ] W4 NL LLM fallback enabled (resident model exists)
 - [~] **M4** Local capture _(needs native SCK/WASAPI/PipeWire FFI)_ · **M5** Transcribe & understand _(full pipeline + MeetingArtifactV1 + resolvable evidence green on mock STT/LLM; needs whisper.cpp/llama.cpp FFI)_ · **M6** *Phase 2 ship (v0.5)*
 

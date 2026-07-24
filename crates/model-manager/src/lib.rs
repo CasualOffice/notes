@@ -47,6 +47,7 @@ pub mod error;
 pub mod manifest;
 pub mod pipeline;
 pub mod registry;
+pub mod select;
 pub mod tier;
 
 #[cfg(test)]
@@ -58,9 +59,10 @@ pub use disk::{estimate_dir_size, preflight, DiskBudget, SpaceEstimate};
 pub use download::{DownloadEvent, DownloadOutcome, DownloadRequest, Downloader, MockDownloader};
 pub use error::{ModelError, ModelResult};
 pub use manifest::{
-    is_sha256_hex, HardwareRequirements, ModelEngine, ModelManifest, SignatureVerifier,
-    TrustAllVerifier,
+    is_sha256_hex, primary_subtag, HardwareRequirements, LanguageSupport, ModelEngine,
+    ModelManifest, SignatureVerifier, TrustAllVerifier,
 };
 pub use pipeline::{default_rel_path, import_local, install_from_download, InstallConfig};
 pub use registry::{InstallSource, ModelInstallation, ModelRegistry};
+pub use select::{select_for_language, select_pack, LanguagePreference, Selection};
 pub use tier::{tier_for_ram, HardwareTier, TierProfile, TierRecommendation};

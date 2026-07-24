@@ -296,6 +296,8 @@ One encrypted store holds everything; a crash never loses source-of-truth data.
 
 **Only two components may open a socket**, and only with explicit user consent: `model-download` (in `model-manager`) and `updater`. Every other crate is built and tested against a network-disabled harness; "Offline Ready" is an automated test target.
 
+**Language-aware, on-demand model download.** Models are not bundled; they are fetched (resumable, SHA-256-verified, signed-manifest) only when the user consents. Each catalog manifest declares a `LanguageSupport` (multilingual, or `Only(["en", …])` for language-specialized variants like Whisper `*.en`). The registry selects a pack by **(hardware tier × the user's language)** — the user's language comes from the OS locale or an explicit setting: a Whisper `*.en` model is preferred for an English user (smaller/faster/more accurate), a multilingual Whisper for any other language, and multilingual instruct LLMs (Qwen3-class) and a multilingual embedder (bge-m3-class) cover the user's language for summaries/extraction/search. With auto-detect on, a multilingual STT is kept so mixed-language speech still transcribes. So "download the model for *his* language" is a first-class flow: `model_manager::select_pack(catalog, tier, LanguagePreference)` → the right STT/LLM/embedder ids → on-demand fetch. Changing language later just downloads the additional pack.
+
 ```
    All core paths (write, plan, record, transcribe, reason, search)
         |
