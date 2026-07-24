@@ -14,9 +14,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Backlinks } from "./features/backlinks";
 import { Editor } from "./features/editor";
+import { Meetings } from "./features/meetings";
 import { Sidebar } from "./features/notebooks";
 import { QuickCapture } from "./features/quick-capture";
 import { api, isTauri, onAppEvent, type NotebookNode, type NoteSummary } from "./lib/api";
+
+/** The two top-level pillars surfaced in the shell nav. */
+type View = "notes" | "meetings";
 
 const NOTE_EVENTS = new Set(["NoteSaved", "NoteProjected"]);
 const NOTEBOOK_EVENTS = new Set(["NotebooksChanged"]);
@@ -41,6 +45,7 @@ export function App(): React.JSX.Element {
   const [notes, setNotes] = useState<NoteSummary[]>([]);
   const [allNotes, setAllNotes] = useState<NoteSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [view, setView] = useState<View>("notes");
   const [error, setError] = useState<string>("");
   const booted = useRef<boolean>(false);
   const notebookRef = useRef<string | null>(null);
@@ -162,14 +167,34 @@ export function App(): React.JSX.Element {
       <header className="topbar">
         <div className="brand">
           <span className="brand-mark">Casual Note</span>
-          <span className="brand-sub">Notes</span>
+          <span className="brand-sub">{view === "notes" ? "Notes" : "Meetings"}</span>
         </div>
-        <QuickCapture
-          onCaptured={(r) => {
-            void refreshNotes().catch(() => undefined);
-            if (r.entity_ref.kind === "note") select(r.entity_ref.id);
-          }}
-        />
+        <nav className="nav-tabs" aria-label="Pillars">
+          <button
+            type="button"
+            className={`nav-tab${view === "notes" ? " active" : ""}`}
+            aria-current={view === "notes"}
+            onClick={() => setView("notes")}
+          >
+            Notes
+          </button>
+          <button
+            type="button"
+            className={`nav-tab${view === "meetings" ? " active" : ""}`}
+            aria-current={view === "meetings"}
+            onClick={() => setView("meetings")}
+          >
+            Meetings
+          </button>
+        </nav>
+        {view === "notes" && (
+          <QuickCapture
+            onCaptured={(r) => {
+              void refreshNotes().catch(() => undefined);
+              if (r.entity_ref.kind === "note") select(r.entity_ref.id);
+            }}
+          />
+        )}
         <span className="mode-pill">{isTauri ? "Local store" : "Preview (sample data)"}</span>
       </header>
 
@@ -179,7 +204,10 @@ export function App(): React.JSX.Element {
         </div>
       )}
 
-      <div className="workspace">
+      {view === "meetings" ? (
+        <Meetings />
+      ) : (
+        <div className="workspace">
         <Sidebar
           notebooks={notebooks}
           selectedNotebookId={selectedNotebookId}
@@ -216,7 +244,8 @@ export function App(): React.JSX.Element {
             </div>
           </div>
         )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

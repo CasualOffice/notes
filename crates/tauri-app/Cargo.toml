@@ -26,6 +26,10 @@ path = "src/main.rs"
 [dependencies]
 app-domain = { workspace = true }
 app-service = { workspace = true }
+# The capture-source enumeration types + `ApplicationCaptureAdapter` trait, used by
+# the `meeting.listApplications` command over the mock adapter (a pure core crate; no
+# native capture backend). Path dep — not a workspace-wide dependency.
+capture-api = { path = "../capture-api" }
 # Store construction + key custody live in `storage`; the host wires them into
 # `app-service::Service` at boot (the WebView never touches either).
 storage = { workspace = true }

@@ -1,4 +1,5 @@
 // feature: meetings
-// Meeting capture, transcript, artifact review (HLD §8.4)
-// Phase-1 placeholder — module wiring lands with its backing HLD §6 commands.
-export {};
+// Meeting capture, live transcript, evidence-cited artifact review (HLD §8.4).
+export { Meetings } from "./Meetings";
+export { useMeetingSession } from "./useMeetingSession";
+export type { MeetingSession, MeetingPhase } from "./useMeetingSession";

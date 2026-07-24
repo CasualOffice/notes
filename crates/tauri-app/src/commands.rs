@@ -327,32 +327,14 @@ pub(crate) fn platform_caps() -> PlatformCaps {
     }
 }
 
+// --- Meeting intelligence (M2) ----------------------------------------------
+//
+// The `meeting.*` session command surface (HLD §6) lives in [`crate::session`]: it
+// owns the host-side session runner (mock capture-threading over the `app-service`
+// coordinator) and its discrete controls. Registered alongside these in the invoke
+// handler.
+
 // --- Later-phase stubs (typed "not implemented in this phase") --------------
-
-#[tauri::command]
-pub fn meeting_preflight() -> Result<serde_json::Value, AppError> {
-    Err(stubs::not_implemented("meeting.preflight"))
-}
-
-#[tauri::command]
-pub fn meeting_start() -> Result<serde_json::Value, AppError> {
-    Err(stubs::not_implemented("meeting.start"))
-}
-
-#[tauri::command]
-pub fn meeting_stop() -> Result<serde_json::Value, AppError> {
-    Err(stubs::not_implemented("meeting.stop"))
-}
-
-#[tauri::command]
-pub fn meeting_artifact() -> Result<serde_json::Value, AppError> {
-    Err(stubs::not_implemented("meeting.artifact"))
-}
-
-#[tauri::command]
-pub fn meeting_action_item_to_task() -> Result<serde_json::Value, AppError> {
-    Err(stubs::not_implemented("meeting.actionItemToTask"))
-}
 
 #[tauri::command]
 pub fn ai_ask() -> Result<serde_json::Value, AppError> {

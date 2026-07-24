@@ -136,6 +136,134 @@ export interface AppEventEnvelope {
   [key: string]: unknown;
 }
 
+// ---- M2: meeting intelligence (HLD §8.4, Data Model §14.1) ----------------
+
+/**
+ * A transcript segment as pushed on `LiveTranscript` and returned by
+ * `meeting.transcript` (app-domain `TranscriptSegment`). `pass` is `"live"` for
+ * provisional pass-1 hypotheses (superseded) and `"final"` for the authoritative
+ * pass-2 evidence anchors.
+ */
+export interface TranscriptSegmentT {
+  segment_id: string;
+  t_start_ms: number;
+  t_end_ms: number;
+  speaker: string | null;
+  text: string;
+  pass: "live" | "final";
+  confidence: number | null;
+}
+
+/** A discussion topic with its supporting evidence (Data Model §14.1). */
+export interface ArtifactTopic {
+  title: string;
+  summary: string;
+  evidence_segment_ids: string[];
+}
+
+/** A decision reached, with optional rationale. */
+export interface ArtifactDecision {
+  statement: string;
+  rationale: string | null;
+  evidence_segment_ids: string[];
+}
+
+/** An action item — `owner`/`due_date` null unless stated in the cited evidence. */
+export interface ArtifactActionItem {
+  task: string;
+  owner: string | null;
+  due_date: string | null;
+  evidence_segment_ids: string[];
+}
+
+/** A risk raised during the meeting. */
+export interface ArtifactRisk {
+  statement: string;
+  evidence_segment_ids: string[];
+}
+
+/** An unresolved question left open. */
+export interface ArtifactOpenQuestion {
+  question: string;
+  evidence_segment_ids: string[];
+}
+
+/** The immutable-per-generation meeting artifact (Data Model §14.1). */
+export interface MeetingArtifactV1 {
+  schema: string;
+  session_id: string;
+  executive_summary: string;
+  topics: ArtifactTopic[];
+  decisions: ArtifactDecision[];
+  action_items: ArtifactActionItem[];
+  risks: ArtifactRisk[];
+  open_questions: ArtifactOpenQuestion[];
+}
+
+/** An application that can be selected as a capture source (`capture-api`). */
+export interface CapturableAppT {
+  app_id: string;
+  display_name: string;
+  executable: string | null;
+  produces_audio: boolean;
+}
+
+/** Honest per-platform capture capabilities (HLD §9.1; capability honesty). */
+export interface CaptureCapabilitiesT {
+  platform: string;
+  app_level_audio: "supported" | "best_effort" | "unsupported";
+  exclude_self: boolean;
+  microphone: boolean;
+  system_fallback: "not_applicable" | "explicit_only" | "unavailable";
+  health: { state: string; reason?: string };
+}
+
+/** The grant state of the OS permissions a capture needs. */
+export interface PermissionReportT {
+  screen_capture: string;
+  microphone: string;
+  portal: string;
+  all_granted: boolean;
+}
+
+/** `meeting.preflight` — the capability + permission gate for the arm affordance. */
+export interface PreflightReportT {
+  capabilities: CaptureCapabilitiesT;
+  permissions: PermissionReportT;
+  ready: boolean;
+}
+
+/** A `session` row projection (`meeting.get`). */
+export interface SessionViewT {
+  id: string;
+  state: string;
+  note_id: string | null;
+  started_at: number | null;
+  ended_at: number | null;
+  duration_ms: number | null;
+  platform: string;
+  degraded_reason: string | null;
+}
+
+/** One suggested `action_item` — the review surface before promotion to a Task. */
+export interface ActionItemViewT {
+  id: string;
+  idx: number;
+  task_text: string;
+  owner_text: string | null;
+  due_date: string | null;
+  evidence_segment_ids: string[];
+  status: string;
+  promoted_task_id: string | null;
+}
+
+/** The `meeting.start` payload (echoes `app-service::MeetingConfig`). */
+export interface MeetingStartConfig {
+  sources: string[];
+  captureMicrophone: boolean;
+  title?: string | null;
+}
+
 /**
  * True inside a real Tauri window. The globals are injected by the Tauri runtime
  * before any app code runs, so this is stable at module-eval time.
@@ -220,6 +348,62 @@ export const api = {
 
   searchQuery: (q: string): Promise<SearchResults> =>
     call<SearchResults>("search_query", { q, mode: "go", limit: 20 }),
+
+  // ---- M2: meeting intelligence (HLD §8.4) -------------------------------
+
+  /** The applications available as capture sources for the picker. */
+  meetingListApps: (): Promise<CapturableAppT[]> =>
+    call<CapturableAppT[]>("meeting_list_apps", {}),
+
+  /** `meeting.preflight` → honest capability + permission report (never records). */
+  meetingPreflight: (sources: string[]): Promise<PreflightReportT> =>
+    call<PreflightReportT>("meeting_preflight", { sources }),
+
+  /** `meeting.start` → the new session id (NEW→…→RECORDING). */
+  meetingStart: (config: MeetingStartConfig): Promise<string> =>
+    call<string>("meeting_start", {
+      sources: config.sources,
+      capture_microphone: config.captureMicrophone,
+      exclude_self: true,
+      sample_rate_hz: 48_000,
+      title: config.title ?? null,
+    }),
+
+  /** `meeting.pause` → the resulting `SessionState`. The LLM never owns this. */
+  meetingPause: (sessionId: string): Promise<string> =>
+    call<string>("meeting_pause", { session_id: sessionId }),
+
+  /** `meeting.resume` → the resulting `SessionState`. */
+  meetingResume: (sessionId: string): Promise<string> =>
+    call<string>("meeting_resume", { session_id: sessionId }),
+
+  /** `meeting.stop` → STOPPING→CAPTURED→…→COMPLETE (progress arrives via events). */
+  meetingStop: (sessionId: string): Promise<string> =>
+    call<string>("meeting_stop", { session_id: sessionId }),
+
+  /** `meeting.get` → the current `session` row projection. */
+  meetingGet: (sessionId: string): Promise<SessionViewT> =>
+    call<SessionViewT>("meeting_get", { session_id: sessionId }),
+
+  /** The persisted final transcript (pass-2 evidence anchors) for review. */
+  meetingTranscript: (sessionId: string): Promise<TranscriptSegmentT[]> =>
+    call<TranscriptSegmentT[]>("meeting_transcript", { session_id: sessionId }),
+
+  /** `meeting.artifact` → the evidence-resolved `MeetingArtifactV1`. */
+  meetingArtifact: (sessionId: string): Promise<MeetingArtifactV1> =>
+    call<MeetingArtifactV1>("meeting_artifact", { session_id: sessionId }),
+
+  /** The suggested action items for a session (the review surface). */
+  meetingActionItems: (sessionId: string): Promise<ActionItemViewT[]> =>
+    call<ActionItemViewT[]>("meeting_action_items", { session_id: sessionId }),
+
+  /** `meeting.actionItemToTask` → the new Task id (writes `spawned_from` + evidence). */
+  meetingActionItemToTask: (sessionId: string, actionItemId: string): Promise<string> =>
+    call<string>("meeting_action_item_to_task", {
+      session_id: sessionId,
+      action_item_id: actionItemId,
+      overrides: null,
+    }),
 };
 
 /**

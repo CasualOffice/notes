@@ -13,17 +13,23 @@
  */
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import type {
+  ActionItemViewT,
   AppEventEnvelope,
   BacklinkRef,
+  CapturableAppT,
   CaptureResult,
+  MeetingArtifactV1,
   Note,
   NotebookNode,
   NoteSummary,
   NoteView,
   ParsedEntry,
+  PreflightReportT,
   SaveResult,
   SearchResults,
+  SessionViewT,
   TaskView,
+  TranscriptSegmentT,
   UnlinkedMention,
 } from "./api";
 
@@ -232,11 +238,142 @@ function markdownToDoc(md: string): string {
   return JSON.stringify({ type: "doc", content });
 }
 
+// ---- Meeting intelligence fixtures (M2 preview) ---------------------------
+
+/** The mock capturable applications the source picker lists. */
+const CAPTURABLE_APPS: CapturableAppT[] = [
+  { app_id: "us.zoom.xos", display_name: "Zoom", executable: null, produces_audio: true },
+  { app_id: "com.tinyspeck.slackmacgap", display_name: "Slack huddle", executable: null, produces_audio: true },
+  { app_id: "com.google.Chrome", display_name: "Google Meet (Chrome)", executable: null, produces_audio: true },
+  { app_id: "com.microsoft.teams2", display_name: "Microsoft Teams", executable: null, produces_audio: false },
+];
+
+/** One line of the canned meeting script (speaker + spoken text). */
+interface ScriptLine {
+  speaker: string;
+  text: string;
+}
+
+const MEETING_SCRIPT: ScriptLine[] = [
+  { speaker: "Alex", text: "Let's start with the Q3 roadmap. The biggest theme is reducing capture friction." },
+  { speaker: "Priya", text: "Agreed. Users drop off when quick capture takes more than about two seconds." },
+  { speaker: "Alex", text: "So the decision is we ship the sub-two-second capture target for the beta." },
+  { speaker: "Sam", text: "I can own the capture latency work. I'll have a prototype by next Friday." },
+  { speaker: "Priya", text: "We also need to improve search recall — fusing vector results with FTS." },
+  { speaker: "Alex", text: "Let's make Priya the owner of the search fusion evaluation, due end of month." },
+  { speaker: "Sam", text: "One risk: local inference might not hit our latency target on older machines." },
+  { speaker: "Priya", text: "Open question — how far do we push local models before the first model download?" },
+];
+
+const SEGMENT_MS = 6000;
+
+/** A fully-formed meeting: final segments + the artifact + suggested action items,
+ * with every evidence id resolving to a real segment (parity with the coordinator's
+ * "evidence or nothing" cleaning). Fresh ids per session so nothing collides. */
+interface MeetingFixture {
+  segments: TranscriptSegmentT[];
+  artifact: MeetingArtifactV1;
+  actionItems: ActionItemViewT[];
+}
+
+function makeMeetingFixture(sessionId: string): MeetingFixture {
+  const segments: TranscriptSegmentT[] = MEETING_SCRIPT.map((line, i) => ({
+    segment_id: uuid(),
+    t_start_ms: i * SEGMENT_MS,
+    t_end_ms: (i + 1) * SEGMENT_MS,
+    speaker: line.speaker,
+    text: line.text,
+    pass: "final" as const,
+    confidence: 0.9,
+  }));
+  const seg = (i: number): string => segments[i]?.segment_id ?? "";
+
+  const artifact: MeetingArtifactV1 = {
+    schema: "MeetingArtifactV1",
+    session_id: sessionId,
+    executive_summary:
+      "The team aligned the Q3 roadmap around reducing capture friction and improving " +
+      "search recall — committing to a sub-two-second quick-capture target for the beta " +
+      "and a hybrid FTS-plus-vector search evaluation.",
+    topics: [
+      {
+        title: "Reducing capture friction",
+        summary: "Capture friction is the headline Q3 theme; users abandon capture past two seconds.",
+        evidence_segment_ids: [seg(0), seg(1), seg(2)],
+      },
+      {
+        title: "Improving search recall",
+        summary: "Search recall improves by fusing vector similarity with the existing FTS index.",
+        evidence_segment_ids: [seg(4), seg(5)],
+      },
+    ],
+    decisions: [
+      {
+        statement: "Ship a sub-two-second quick-capture target for the beta.",
+        rationale: "Users drop off when capture takes longer than about two seconds.",
+        evidence_segment_ids: [seg(1), seg(2)],
+      },
+    ],
+    action_items: [
+      {
+        task: "Prototype the capture-latency work",
+        owner: "Sam",
+        due_date: null,
+        evidence_segment_ids: [seg(3)],
+      },
+      {
+        task: "Run the FTS + vector search-fusion evaluation",
+        owner: "Priya",
+        due_date: "2026-07-31",
+        evidence_segment_ids: [seg(5)],
+      },
+    ],
+    risks: [
+      {
+        statement: "Local inference may not meet the latency target on older machines.",
+        evidence_segment_ids: [seg(6)],
+      },
+    ],
+    open_questions: [
+      {
+        question: "How far should local models be pushed before the first model download?",
+        evidence_segment_ids: [seg(7)],
+      },
+    ],
+  };
+
+  const actionItems: ActionItemViewT[] = artifact.action_items.map((ai, idx) => ({
+    id: uuid(),
+    idx,
+    task_text: ai.task,
+    owner_text: ai.owner,
+    due_date: ai.due_date,
+    evidence_segment_ids: ai.evidence_segment_ids,
+    status: "suggested",
+    promoted_task_id: null,
+  }));
+
+  return { segments, artifact, actionItems };
+}
+
+/** The live state of one simulated meeting session. */
+interface MeetingRuntime {
+  id: string;
+  state: string;
+  title: string | null;
+  fixture: MeetingFixture;
+  liveIdx: number;
+  startedAt: number;
+  levelTimer: ReturnType<typeof setInterval> | null;
+  liveTimer: ReturnType<typeof setInterval> | null;
+}
+
 class MockCore {
   private notes = new Map<string, NoteView>();
   private notebooks: NotebookRow[] = [];
   private tasks: TaskView[] = [];
   private reminders = new Set<string>();
+  private meetings = new Map<string, MeetingRuntime>();
   private handlers = new Set<Handler>();
   private seq = 0;
 
@@ -586,6 +723,33 @@ class MockCore {
       }
       case "nlp_parse":
         return parse(String(args["text"]));
+
+      // ---- M2: meeting intelligence ------------------------------------
+      case "meeting_list_apps":
+        return CAPTURABLE_APPS;
+      case "meeting_preflight":
+        return this.meetingPreflight();
+      case "meeting_start":
+        return this.meetingStart(args);
+      case "meeting_pause":
+        return this.meetingPause(String(args["session_id"]));
+      case "meeting_resume":
+        return this.meetingResume(String(args["session_id"]));
+      case "meeting_stop":
+        return this.meetingStop(String(args["session_id"]));
+      case "meeting_get":
+        return this.meetingView(this.meeting(String(args["session_id"])));
+      case "meeting_transcript":
+        return this.meeting(String(args["session_id"])).fixture.segments;
+      case "meeting_artifact":
+        return this.meeting(String(args["session_id"])).fixture.artifact;
+      case "meeting_action_items":
+        return this.meeting(String(args["session_id"])).fixture.actionItems;
+      case "meeting_action_item_to_task":
+        return this.meetingActionItemToTask(
+          String(args["session_id"]),
+          String(args["action_item_id"]),
+        );
       case "search_query": {
         const q = String(args["q"]).toLowerCase();
         const hits = [...this.notes.values()]
@@ -596,6 +760,194 @@ class MockCore {
       default:
         throw new Error(`mock: unhandled command ${cmd}`);
     }
+  }
+
+  // ---- Meeting simulation -------------------------------------------------
+
+  private meeting(id: string): MeetingRuntime {
+    const rt = this.meetings.get(id);
+    if (!rt) throw new Error(`session ${id} not found`);
+    return rt;
+  }
+
+  private meetingView(rt: MeetingRuntime): SessionViewT {
+    const ended = rt.state === "COMPLETE" ? rt.startedAt + MEETING_SCRIPT.length * SEGMENT_MS : null;
+    return {
+      id: rt.id,
+      state: rt.state,
+      note_id: rt.state === "COMPLETE" ? uuid() : null,
+      started_at: rt.startedAt,
+      ended_at: ended,
+      duration_ms: ended ? ended - rt.startedAt : null,
+      platform: "linux",
+      degraded_reason: null,
+    };
+  }
+
+  /** Honest preflight — everything granted so the picker can arm in preview. */
+  private meetingPreflight(): PreflightReportT {
+    return {
+      capabilities: {
+        platform: "linux",
+        app_level_audio: "best_effort",
+        exclude_self: true,
+        microphone: true,
+        system_fallback: "explicit_only",
+        health: { state: "ready" },
+      },
+      permissions: {
+        screen_capture: "granted",
+        microphone: "granted",
+        portal: "granted",
+        all_granted: true,
+      },
+      ready: true,
+    };
+  }
+
+  /** Move a session to a new state and push `SessionStateChanged` (HLD §7). */
+  private meetingTransition(rt: MeetingRuntime, to: string): void {
+    const from = rt.state;
+    rt.state = to;
+    this.emit("SessionStateChanged", { session_id: rt.id, from, to, degraded: null });
+  }
+
+  private clearMeetingTimers(rt: MeetingRuntime): void {
+    if (rt.levelTimer !== null) clearInterval(rt.levelTimer);
+    if (rt.liveTimer !== null) clearInterval(rt.liveTimer);
+    rt.levelTimer = null;
+    rt.liveTimer = null;
+  }
+
+  /** Emit a throttled level meter + stream the next provisional (pass-1) line. */
+  private startMeetingTimers(rt: MeetingRuntime): void {
+    this.clearMeetingTimers(rt);
+    rt.levelTimer = setInterval(() => {
+      // A lively but bounded RMS meter, in dBFS (−48..−8).
+      const rms = -34 + Math.sin(Date.now() / 220) * 12 + (Math.random() * 8 - 4);
+      this.emit("CaptureLevel", { session_id: rt.id, rms_dbfs: Math.max(-60, Math.min(-6, rms)) });
+    }, 250);
+    rt.liveTimer = setInterval(() => {
+      const line = MEETING_SCRIPT[rt.liveIdx];
+      if (!line) return; // script exhausted — meter keeps running until stop
+      this.emit("LiveTranscript", {
+        session_id: rt.id,
+        segment: {
+          segment_id: uuid(),
+          t_start_ms: rt.liveIdx * SEGMENT_MS,
+          t_end_ms: (rt.liveIdx + 1) * SEGMENT_MS,
+          speaker: line.speaker,
+          text: line.text,
+          pass: "live",
+          confidence: 0.62,
+        } satisfies TranscriptSegmentT,
+      });
+      rt.liveIdx += 1;
+    }, 1100);
+  }
+
+  private meetingStart(args: Record<string, unknown>): string {
+    const id = uuid();
+    const rt: MeetingRuntime = {
+      id,
+      state: "NEW",
+      title: (args["title"] as string | null) ?? null,
+      fixture: makeMeetingFixture(id),
+      liveIdx: 0,
+      startedAt: this.now(),
+      levelTimer: null,
+      liveTimer: null,
+    };
+    this.meetings.set(id, rt);
+    // NEW → PREFLIGHT → READY → RECORDING (the LLM never owns this path). Deferred
+    // one macrotask so these state events land *after* the caller has the session id
+    // and has begun listening — otherwise the WebView would filter its own start.
+    setTimeout(() => {
+      this.meetingTransition(rt, "PREFLIGHT");
+      this.meetingTransition(rt, "READY");
+      this.meetingTransition(rt, "RECORDING");
+      this.startMeetingTimers(rt);
+    }, 0);
+    return id;
+  }
+
+  private meetingPause(id: string): string {
+    const rt = this.meeting(id);
+    if (rt.state === "RECORDING") {
+      this.clearMeetingTimers(rt);
+      this.meetingTransition(rt, "PAUSED");
+    }
+    return rt.state;
+  }
+
+  private meetingResume(id: string): string {
+    const rt = this.meeting(id);
+    if (rt.state === "PAUSED") {
+      this.meetingTransition(rt, "RECORDING");
+      this.startMeetingTimers(rt);
+    }
+    return rt.state;
+  }
+
+  /**
+   * Stop → drive the tail of the pipeline (STOPPING → CAPTURED →
+   * FINAL_TRANSCRIBING → GENERATING → INDEXING → COMPLETE) over time, streaming the
+   * authoritative final segments, then `ArtifactReady` + `IndexingProgress`. Capture
+   * has already completed, so a slow generation never rewinds recording.
+   */
+  private meetingStop(id: string): string {
+    const rt = this.meeting(id);
+    if (rt.state !== "RECORDING" && rt.state !== "PAUSED") return rt.state;
+    this.clearMeetingTimers(rt);
+    this.meetingTransition(rt, "STOPPING");
+
+    const step = (ms: number, fn: () => void): void => {
+      setTimeout(() => {
+        try {
+          fn();
+        } catch {
+          /* preview-only: ignore */
+        }
+      }, ms);
+    };
+
+    step(200, () => this.meetingTransition(rt, "CAPTURED"));
+    step(350, () => this.meetingTransition(rt, "FINAL_TRANSCRIBING"));
+    // Stream the final (pass-2) segments as the authoritative evidence lands.
+    rt.fixture.segments.forEach((s, i) => {
+      step(500 + i * 180, () => this.emit("LiveTranscript", { session_id: rt.id, segment: s }));
+    });
+    const afterFinal = 500 + rt.fixture.segments.length * 180 + 250;
+    step(afterFinal, () => this.meetingTransition(rt, "GENERATING"));
+    step(afterFinal + 500, () => {
+      this.emit("ArtifactReady", { session_id: rt.id });
+      this.meetingTransition(rt, "INDEXING");
+    });
+    step(afterFinal + 650, () =>
+      this.emit("IndexingProgress", { session_id: rt.id, stage: "note", pct: 0.3 }),
+    );
+    step(afterFinal + 800, () =>
+      this.emit("IndexingProgress", { session_id: rt.id, stage: "action_items", pct: 0.7 }),
+    );
+    step(afterFinal + 950, () => {
+      this.emit("IndexingProgress", { session_id: rt.id, stage: "complete", pct: 1.0 });
+      this.meetingTransition(rt, "COMPLETE");
+    });
+    return rt.state;
+  }
+
+  private meetingActionItemToTask(sessionId: string, actionItemId: string): string {
+    const rt = this.meeting(sessionId);
+    const ai = rt.fixture.actionItems.find((x) => x.id === actionItemId);
+    if (!ai) throw new Error(`action_item ${actionItemId} not found`);
+    if (ai.promoted_task_id) return ai.promoted_task_id; // idempotent
+    const t = this.makeTask(ai.task_text);
+    if (ai.due_date) t.deadline_on = ai.due_date;
+    this.tasks.push(t);
+    ai.status = "promoted";
+    ai.promoted_task_id = t.id;
+    this.emit("TaskChanged", { task_id: t.id });
+    return t.id;
   }
 
   private route(parsed: ParsedEntry, raw: string): { kind: string; id: string } {

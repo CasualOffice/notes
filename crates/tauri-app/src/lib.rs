@@ -22,10 +22,12 @@
 //!    `tauri.conf.json`; the tray and the hotkey toggle its visibility.
 
 mod commands;
+mod session;
 
 use std::sync::Arc;
 
 use app_service::{EventSink, Service};
+use session::SessionManager;
 use storage::Paths;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::TrayIconBuilder;
@@ -154,7 +156,23 @@ pub fn run() {
                 Ok(_) => {}
                 Err(e) => tracing::warn!(error = %e, "journal recovery failed"),
             }
-            app.manage(Arc::new(service));
+            let service = Arc::new(service);
+            app.manage(service.clone());
+
+            // The M2 meeting-intelligence runner: the mock-engine session coordinator
+            // (mock capture + speech + deterministic-fallback LLM) plus the host-side
+            // discrete-control registry driving it (HLD §8.4). Sharing the one
+            // `Service` keeps every meeting mutation on the single op-log writer. A
+            // runtime-build failure here is fatal like the store: without it the
+            // meeting command surface cannot function.
+            let manager = match SessionManager::new_with_mocks(service.clone()) {
+                Ok(m) => m,
+                Err(e) => {
+                    tracing::error!(error = %e, "failed to build the meeting session manager");
+                    return Err(Box::new(e) as Box<dyn std::error::Error>);
+                }
+            };
+            app.manage(Arc::new(manager));
 
             // System tray: Open / Quick Capture / Quit (HLD §4).
             build_tray(app)?;
@@ -200,11 +218,18 @@ pub fn run() {
             commands::get_capabilities,
             commands::search_query,
             commands::palette_run,
-            commands::meeting_preflight,
-            commands::meeting_start,
-            commands::meeting_stop,
-            commands::meeting_artifact,
-            commands::meeting_action_item_to_task,
+            // --- Meeting intelligence (M2) session surface (HLD §6 `meeting.*`) ---
+            session::list_capture_apps,
+            session::run_preflight,
+            session::start_session,
+            session::pause_session,
+            session::resume_session,
+            session::stop_session,
+            session::cancel_job,
+            session::regenerate_artifact,
+            session::get_session,
+            session::list_action_items,
+            session::action_item_to_task,
             commands::ai_ask,
             commands::ai_suggestions_list,
             commands::models_list,
