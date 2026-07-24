@@ -110,7 +110,7 @@ _**M0 and M1 are DONE**, verified green via `./scripts/ci-local.sh`. Phase-2 eng
 
 ## Calendar & System-Calendar Sync  (W13 — new; see [`docs/casual-note-calendar.md`](./docs/casual-note-calendar.md))
 _Promoted from a v1 non-goal at product-owner request. Privacy-first: syncs only with the user's own system calendar/account; Casual Note runs no calendar server and touches no third party._
-- [~] `calendar` engine crate: domain model (Calendar/Event, RRULE), RFC 5545 **ICS** import/export, RFC 4791 **CalDAV** two-way sync, `CalendarSyncAdapter` trait + capability tiers _(building now — standalone/disjoint crate)_
+- [x] `calendar` engine crate: domain model (Calendar/Event, RRULE), RFC 5545 **ICS** round-trip, RFC 4791 **CalDAV** two-way sync (sync-collection pull, If-Match push), `CalendarSyncAdapter` trait + capability tiers, conflict resolution (losing local edit preserved) — 40 tests green
 - [ ] Native adapters: macOS **EventKit**, Linux **Evolution-Data-Server**, Windows **AppointmentManager** (behind the FFI seam; CalDAV/ICS is the universal baseline)
 - [ ] app-service wiring + Tauri commands/events (after M2): project tasks/reminders/meetings → events; conflict resolution (ETag/LWW, losing local edit preserved)
 - [ ] UI: calendar view (month/week/day/agenda) overlaying system events + Casual Note items; account setup; capability-honesty banner
