@@ -1,7 +1,7 @@
 [package]
 publish = false                 # internal workspace crate — never published to crates.io
 name = "embeddings"
-description = "STUB (later phase): embedding trait + sqlite-vec integration (Matryoshka-256 int8)."
+description = "Local embeddings: Embedder trait + deterministic MockEmbedder, a brute-force cosine-KNN vector store (sqlite-vec seam), and Matryoshka/int8 helpers."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -9,5 +9,21 @@ authors.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
-[dependencies]
+[lib]
+name = "embeddings"
 
+# Pure-Rust + mock layer (Architecture §5 "Embeddings", Data Model §9.2/§9.3).
+# The real embedding model (GGUF/ONNX) and the native sqlite-vec extension are
+# OUT OF SCOPE here — both are left as documented seams. Depends downward only on
+# app-domain (shared types) plus rusqlite (the SAME workspace-pinned build that
+# `storage` links, so no second SQLite is dragged into the tree).
+[dependencies]
+app-domain = { workspace = true }
+rusqlite   = { workspace = true }
+serde      = { workspace = true }
+thiserror  = { workspace = true }
+
+# Content hashing for the incremental re-embed gate. BLAKE3 matches the
+# `chunk.content_hash` algorithm named in Data Model §9.2/§3. Pure-Rust,
+# permissively licensed (CC0-1.0 OR Apache-2.0 OR MIT), no OpenSSL / no network.
+blake3 = "1.5"

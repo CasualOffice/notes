@@ -4158,6 +4158,7 @@ version = "0.1.0"
 dependencies = [
  "app-domain",
  "app-service",
+ "capture-api",
  "serde",
  "serde_json",
  "storage",
