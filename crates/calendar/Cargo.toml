@@ -1,0 +1,46 @@
+# Calendar engine crate for Casual Note (Workstream W13).
+# See docs/casual-note-calendar.md. This is the pure-Rust + protocol layer:
+# domain model, RFC 5545 ICS import/export, and Casual Note -> event projection.
+# Real HTTP/CalDAV transport and native OS calendar FFI live behind seams added
+# in the sync phase; this crate has no network or FFI code.
+[package]
+# REQUIRED: this crate has a path dep on app-domain; cargo-deny bans wildcard
+# path deps on publishable crates, so it must never be published.
+publish = false
+name = "calendar"
+description = "Calendar engine: domain model, RFC 5545 ICS import/export, and Casual Note item -> event projection."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+# Shared spine types (Id, Timestamp) — read-only dependency, never modified here.
+app-domain = { workspace = true }
+
+# Shared, workspace-pinned deps (referencing these does not edit the root manifest).
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+rrule = { workspace = true }
+uuid = { workspace = true }
+tracing = { workspace = true }
+
+# Calendar-specific dep: IANA timezone database for resolving TZID <-> UTC when
+# parsing/serializing RFC 5545 DATE-TIME values. Version present in Cargo.lock.
+chrono-tz = "0.9"
+
+# Calendar-specific dep: streaming XML pull-parser for CalDAV DAV:multistatus
+# bodies (RFC 4791/6578). Chosen over a heavy HTTP stack: this crate parses/builds
+# protocol XML only; the actual socket lives behind the `Transport` seam. Version
+# already present in Cargo.lock.
+quick-xml = "0.41"
+
+[dev-dependencies]
+serde_json = { workspace = true }
+# Minimal async runtime for `#[tokio::test]` — the async `Transport`/adapter traits
+# are driven on a current-thread executor in tests. Not a runtime dep of the crate.
+tokio = { workspace = true }
