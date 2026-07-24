@@ -277,8 +277,8 @@ pub fn fuse_channels(
                 .entry(c.chunk_id)
                 .and_modify(|r| *r = (*r).min(rank))
                 .or_insert(rank);
-            if !seen.contains_key(&c.chunk_id) {
-                seen.insert(c.chunk_id, pool.len());
+            if let std::collections::hash_map::Entry::Vacant(e) = seen.entry(c.chunk_id) {
+                e.insert(pool.len());
                 pool.push(c.clone());
             }
         }
