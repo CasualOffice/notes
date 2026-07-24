@@ -57,6 +57,72 @@ export interface TaskView {
   order_key: string;
 }
 
+/** A project row projection (`tasks.projects_areas`). */
+export interface ProjectView {
+  id: string;
+  name: string | null;
+  area_id: string | null;
+  status: string;
+  order_key: string;
+}
+
+/** An area row projection (`tasks.projects_areas`). */
+export interface AreaView {
+  id: string;
+  name: string | null;
+  icon: string | null;
+  order_key: string;
+}
+
+/** The projects + areas the Tasks view groups by (`tasks.projects_areas`). */
+export interface ProjectsAreas {
+  projects: ProjectView[];
+  areas: AreaView[];
+}
+
+/** The status a task can be moved to (`tasks.set_status`). */
+export type TaskStatus = "open" | "completed" | "canceled";
+
+/**
+ * A unified agenda event (`calendar.agenda`) — a read-only projection of a
+ * persisted task/reminder/meeting into a calendar entry via the calendar crate's
+ * projection fns. `source_id` is the originating entity id (jump-to-source).
+ */
+export interface AgendaEvent {
+  uid: string;
+  title: string;
+  start_ms: number;
+  end_ms: number;
+  all_day: boolean;
+  source: "task" | "reminder" | "meeting";
+  source_id: string;
+  status: "confirmed" | "tentative" | "cancelled";
+  location: string | null;
+  description: string | null;
+}
+
+/** One resolved citation on a grounded `AnswerV1` (Data Model §14.2). */
+export interface Citation {
+  chunk_id: string;
+  source_kind: "note_block" | "transcript_window" | "task" | "reminder";
+  source_id: string;
+  t_start_ms: number | null;
+  snippet: string;
+}
+
+/**
+ * The evidence-cited answer (`ai.ask` → `AnswerV1`). When `unanswered` is true,
+ * `citations` is empty and `answer` is the canonical refusal — display nothing
+ * grounded. Every citation on a grounded answer is guaranteed to resolve (N14).
+ */
+export interface AnswerV1 {
+  schema: string;
+  answer: string;
+  citations: Citation[];
+  confidence: number;
+  unanswered: boolean;
+}
+
 export interface ParsedEntry {
   kind: "note" | "task" | "reminder";
   title: string;
@@ -340,6 +406,30 @@ export const api = {
 
   tasksComplete: (taskId: string): Promise<TaskView> =>
     call<TaskView>("tasks_complete", { task_id: taskId, at: null }),
+
+  /** `tasks.set_status` → move a task to open/completed/canceled. */
+  tasksSetStatus: (taskId: string, status: TaskStatus): Promise<TaskView> =>
+    call<TaskView>("tasks_set_status", { task_id: taskId, status }),
+
+  /** `tasks.projects_areas` → the projects + areas the Tasks view groups by. */
+  tasksProjectsAreas: (): Promise<ProjectsAreas> =>
+    call<ProjectsAreas>("tasks_projects_areas", {}),
+
+  // ---- Calendar (read-mostly unified agenda projection) ------------------
+
+  /** `calendar.agenda` → events in `[from_ms, to_ms]`, sorted by `start_ms`. */
+  calendarAgenda: (fromMs: number, toMs: number): Promise<AgendaEvent[]> =>
+    call<AgendaEvent[]>("calendar_agenda", { from_ms: fromMs, to_ms: toMs }),
+
+  /** `calendar.export_ics` → an RFC 5545 ICS document for the window. */
+  calendarExportIcs: (fromMs: number, toMs: number): Promise<string> =>
+    call<string>("calendar_export_ics", { from_ms: fromMs, to_ms: toMs }),
+
+  // ---- AI workspace (grounded, evidence-cited answers) -------------------
+
+  /** `ai.ask` → an `AnswerV1`: a grounded answer + resolvable citations, or a
+   * canonical refusal with `unanswered: true`. */
+  aiAsk: (query: string): Promise<AnswerV1> => call<AnswerV1>("ai_ask", { query }),
 
   captureQuick: (text: string): Promise<CaptureResult> =>
     call<CaptureResult>("capture_quick", { text, kind_hint: null }),

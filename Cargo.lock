@@ -113,11 +113,14 @@ dependencies = [
 name = "app-service"
 version = "0.1.0"
 dependencies = [
+ "ai-workspace",
  "app-domain",
  "app-nlp",
  "async-trait",
+ "calendar",
  "capture-api",
  "chrono",
+ "embeddings",
  "links",
  "llm-api",
  "media-pipeline",

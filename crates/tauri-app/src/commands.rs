@@ -14,9 +14,9 @@ use std::sync::Arc;
 
 use app_domain::{AppError, Bucket, EntityRef, Platform, PlatformCaps};
 use app_service::dto::{
-    BacklinkRef, BacklinkView, BlockView, CaptureResult, LinkResolution, NewReminder, NewTask,
-    Note, NoteSummary, NoteView, NotebookNode, ReminderView, SaveResult, SearchResultsDto,
-    TaskPatch, TaskView, UnlinkedMention,
+    AgendaEvent, BacklinkRef, BacklinkView, BlockView, CaptureResult, LinkResolution, NewReminder,
+    NewTask, Note, NoteSummary, NoteView, NotebookNode, ProjectsAreas, ReminderView, SaveResult,
+    SearchResultsDto, TaskPatch, TaskView, UnlinkedMention,
 };
 use app_service::{stubs, ParsedEntry, Service};
 use tauri::State;
@@ -208,6 +208,20 @@ pub fn tasks_bucket(
 }
 
 #[tauri::command]
+pub fn tasks_set_status(
+    service: State<'_, Arc<Service>>,
+    task_id: String,
+    status: String,
+) -> Result<TaskView, AppError> {
+    service.tasks_set_status(&task_id, &status)
+}
+
+#[tauri::command]
+pub fn tasks_projects_areas(service: State<'_, Arc<Service>>) -> Result<ProjectsAreas, AppError> {
+    service.tasks_projects_areas()
+}
+
+#[tauri::command]
 pub fn projects_create(
     service: State<'_, Arc<Service>>,
     name: String,
@@ -260,6 +274,32 @@ pub fn reminders_upcoming(
     horizon: Option<i64>,
 ) -> Result<Vec<ReminderView>, AppError> {
     service.reminders_upcoming(horizon)
+}
+
+// --- Calendar agenda (read-mostly projection; no new storage tables) --------
+
+/// `calendar.agenda` — the merged, start-sorted, source-tagged agenda across
+/// scheduled tasks, reminders, and meetings within `[from_ms, to_ms]` (absolute
+/// UTC epoch-ms). Read-only: re-projects live pillar rows via the `calendar`
+/// crate; persists nothing (HLD §6, calendar §5).
+#[tauri::command]
+pub fn calendar_agenda(
+    service: State<'_, Arc<Service>>,
+    from_ms: i64,
+    to_ms: i64,
+) -> Result<Vec<AgendaEvent>, AppError> {
+    service.calendar_agenda(from_ms, to_ms)
+}
+
+/// `calendar.export_ics` — the same in-range projection serialized to an RFC 5545
+/// ICS document (calendar §2/§9).
+#[tauri::command]
+pub fn calendar_export_ics(
+    service: State<'_, Arc<Service>>,
+    from_ms: i64,
+    to_ms: i64,
+) -> Result<String, AppError> {
+    service.calendar_export_ics(from_ms, to_ms)
 }
 
 // --- Quick capture & NLP ---------------------------------------------------
@@ -334,12 +374,21 @@ pub(crate) fn platform_caps() -> PlatformCaps {
 // coordinator) and its discrete controls. Registered alongside these in the invoke
 // handler.
 
-// --- Later-phase stubs (typed "not implemented in this phase") --------------
+// --- Grounded AI: Ask your notes (HLD §8.5) --------------------------------
 
+/// `ai.ask` — run the grounded, citation-verified Ask pipeline over the user's
+/// notes + transcripts and return the `AnswerV1` verdict (grounded answer with
+/// resolvable citations, or `unanswered`). Offline mock backends by default
+/// (MockLlm + MockEmbedder); every displayed citation is guaranteed to resolve.
 #[tauri::command]
-pub fn ai_ask() -> Result<serde_json::Value, AppError> {
-    Err(stubs::not_implemented("ai.ask"))
+pub fn ai_ask(
+    service: State<'_, Arc<Service>>,
+    query: String,
+) -> Result<serde_json::Value, AppError> {
+    service.ai_ask(&query)
 }
+
+// --- Later-phase stubs (typed "not implemented in this phase") --------------
 
 #[tauri::command]
 pub fn ai_suggestions_list() -> Result<serde_json::Value, AppError> {

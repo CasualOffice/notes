@@ -1,4 +1,3 @@
 // feature: ai
-// AI workspace — grounded answers with citations (HLD §8.5)
-// Phase-1 placeholder — module wiring lands with its backing HLD §6 commands.
-export {};
+// AI workspace — grounded answers with resolvable citations (Feature Specs §7, HLD §8.5).
+export { AskView } from "./AskView";

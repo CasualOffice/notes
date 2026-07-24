@@ -222,6 +222,66 @@ impl Service {
         })
     }
 
+    /// `tasks.set_status` — convenience over [`Service::tasks_update`] for the UI's
+    /// status control (open / done / canceled …). Validates against the
+    /// `tasks::TaskStatus` vocabulary and closes/reopens via the same op-log path.
+    pub fn tasks_set_status(&self, task_id: &str, status: &str) -> AppResult<TaskView> {
+        // Reject unknown tokens up front so the error is a clean Validation.
+        if TaskStatus::from_db_str(status).is_none() {
+            return Err(AppError::Validation(format!("bad task status {status}")));
+        }
+        self.tasks_update(
+            task_id,
+            TaskPatch {
+                status: Some(status.to_string()),
+                ..TaskPatch::default()
+            },
+        )
+    }
+
+    /// `tasks.projects_areas` — the live project + area index (Data Model §6). Both
+    /// are derived-on-read from their detail tables joined to the live spine.
+    pub fn tasks_projects_areas(&self) -> AppResult<crate::dto::ProjectsAreas> {
+        self.read(|c| {
+            let mut pstmt = c.prepare(
+                "SELECT p.entity_id, e.title, p.area_id, p.status, p.order_key \
+                 FROM project p JOIN entity e ON e.id = p.entity_id \
+                 WHERE e.deleted_at IS NULL ORDER BY p.order_key ASC",
+            )?;
+            let projects = pstmt
+                .query_map([], |r| {
+                    Ok(crate::dto::ProjectView {
+                        id: Id::from_bytes(to16(&r.get::<_, Vec<u8>>(0)?)).to_string(),
+                        name: r.get(1)?,
+                        area_id: r
+                            .get::<_, Option<Vec<u8>>>(2)?
+                            .map(|b| Id::from_bytes(to16(&b)).to_string()),
+                        status: r.get(3)?,
+                        order_key: r.get(4)?,
+                    })
+                })?
+                .collect::<Result<Vec<_>, _>>()?;
+
+            let mut astmt = c.prepare(
+                "SELECT a.entity_id, e.title, a.icon, a.order_key \
+                 FROM area a JOIN entity e ON e.id = a.entity_id \
+                 WHERE e.deleted_at IS NULL ORDER BY a.order_key ASC",
+            )?;
+            let areas = astmt
+                .query_map([], |r| {
+                    Ok(crate::dto::AreaView {
+                        id: Id::from_bytes(to16(&r.get::<_, Vec<u8>>(0)?)).to_string(),
+                        name: r.get(1)?,
+                        icon: r.get(2)?,
+                        order_key: r.get(3)?,
+                    })
+                })?
+                .collect::<Result<Vec<_>, _>>()?;
+
+            Ok(crate::dto::ProjectsAreas { projects, areas })
+        })
+    }
+
     /// `projects.create`.
     pub fn projects_create(&self, name: String, area_id: Option<String>) -> AppResult<String> {
         let id = Id::new();

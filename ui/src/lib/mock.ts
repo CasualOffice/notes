@@ -14,10 +14,14 @@
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import type {
   ActionItemViewT,
+  AgendaEvent,
+  AnswerV1,
   AppEventEnvelope,
+  AreaView,
   BacklinkRef,
   CapturableAppT,
   CaptureResult,
+  Citation,
   MeetingArtifactV1,
   Note,
   NotebookNode,
@@ -25,9 +29,12 @@ import type {
   NoteView,
   ParsedEntry,
   PreflightReportT,
+  ProjectsAreas,
+  ProjectView,
   SaveResult,
   SearchResults,
   SessionViewT,
+  TaskStatus,
   TaskView,
   TranscriptSegmentT,
   UnlinkedMention,
@@ -56,6 +63,16 @@ interface NotebookRow {
   color: string | null;
 }
 
+/** Optional fields when seeding/creating a mock task. */
+interface TaskSeed {
+  priority?: number;
+  someday?: boolean;
+  startOn?: string;
+  deadlineOn?: string;
+  projectId?: string;
+  areaId?: string;
+}
+
 function uuid(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
@@ -68,6 +85,28 @@ function uuid(): string {
 
 /** A blank Tiptap document (single empty paragraph — no empty text nodes). */
 const EMPTY_DOC = JSON.stringify({ type: "doc", content: [{ type: "paragraph" }] });
+
+/** Local `YYYY-MM-DD` for `today + days` (parity with the core's local-date keys). */
+function isoDay(days = 0): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+
+/** Epoch-ms at the local wall-clock `hh:mm` on `today + days`. */
+function atClock(days: number, hh: number, mm = 0): number {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  d.setHours(hh, mm, 0, 0);
+  return d.getTime();
+}
+
+/** Epoch-ms at local midnight for a `YYYY-MM-DD` day (all-day event anchor). */
+function dayToMs(iso: string): number {
+  return new Date(`${iso}T00:00:00`).getTime();
+}
 
 // ---- inline builders (parity with the marks the editor emits) -------------
 
@@ -372,6 +411,9 @@ class MockCore {
   private notes = new Map<string, NoteView>();
   private notebooks: NotebookRow[] = [];
   private tasks: TaskView[] = [];
+  private areas: AreaView[] = [];
+  private projects: ProjectView[] = [];
+  private extraEvents: AgendaEvent[] = [];
   private reminders = new Set<string>();
   private meetings = new Map<string, MeetingRuntime>();
   private handlers = new Set<Handler>();
@@ -499,27 +541,301 @@ class MockCore {
     // A genuinely empty note — deriveTitle yields null, rendered as "Untitled".
     this.putNote(EMPTY_DOC, 1000 * 60 * 60 * 50, { notebookId: personal });
 
+    // Areas + projects the Tasks view groups by.
+    const workArea: AreaView = { id: uuid(), name: "Work", icon: null, order_key: "a0" };
+    const homeArea: AreaView = { id: uuid(), name: "Home", icon: null, order_key: "a1" };
+    this.areas = [workArea, homeArea];
+    const launch: ProjectView = {
+      id: uuid(),
+      name: "Q3 Launch",
+      area_id: workArea.id,
+      status: "open",
+      order_key: "a0",
+    };
+    const homeOps: ProjectView = {
+      id: uuid(),
+      name: "Home ops",
+      area_id: homeArea.id,
+      status: "open",
+      order_key: "a0",
+    };
+    this.projects = [launch, homeOps];
+
+    // Tasks spanning every derived bucket (Feature Specs §3.1). Buckets are queries
+    // over these fields — no stored bucket state.
     this.tasks = [
-      this.makeTask("Draft the M0 acceptance checklist", 2),
-      this.makeTask("Confirm keystore fallback on Linux", 1),
-      this.makeTask("Wire the tray menu actions"),
+      // Today: a deadline that has arrived, and a task scheduled for the past.
+      this.makeTask("Review the M2 acceptance checklist", {
+        priority: 2,
+        deadlineOn: isoDay(0),
+        projectId: launch.id,
+        areaId: workArea.id,
+      }),
+      this.makeTask("Reply to Priya about search fusion", {
+        priority: 1,
+        startOn: isoDay(-1),
+        projectId: launch.id,
+        areaId: workArea.id,
+      }),
+      // Upcoming: scheduled ahead, or a future deadline with no start.
+      this.makeTask("Prepare the beta release notes", {
+        startOn: isoDay(3),
+        projectId: launch.id,
+        areaId: workArea.id,
+      }),
+      this.makeTask("Renew the casualnote.app domain", {
+        deadlineOn: isoDay(6),
+        areaId: homeArea.id,
+      }),
+      // Anytime: actionable, undated.
+      this.makeTask("Wire the tray menu actions", { projectId: launch.id, areaId: workArea.id }),
+      this.makeTask("Sketch the onboarding illustration", { areaId: workArea.id }),
+      // Someday: parked until activated.
+      this.makeTask("Explore the Parakeet speech backend", {
+        someday: true,
+        areaId: workArea.id,
+      }),
+      this.makeTask("Read 'Thinking in Systems'", { someday: true, areaId: homeArea.id }),
+    ];
+
+    // Reminders + meetings projected into the unified agenda. Persisted tasks are
+    // projected dynamically (so newly-created dated tasks appear); these fixed
+    // sources are seeded once, anchored to the current week.
+    this.extraEvents = [
+      {
+        uid: `rem-${uuid()}`,
+        title: "Daily standup",
+        start_ms: atClock(0, 9, 15),
+        end_ms: atClock(0, 9, 30),
+        all_day: false,
+        source: "reminder",
+        source_id: uuid(),
+        status: "confirmed",
+        location: null,
+        description: "Recurring team standup.",
+      },
+      {
+        uid: `mtg-${uuid()}`,
+        title: "Q3 roadmap sync",
+        start_ms: atClock(0, 10),
+        end_ms: atClock(0, 11),
+        all_day: false,
+        source: "meeting",
+        source_id: uuid(),
+        status: "confirmed",
+        location: "Zoom",
+        description: "Align on the Q3 roadmap themes.",
+      },
+      {
+        uid: `rem-${uuid()}`,
+        title: "Call Sam about capture latency",
+        start_ms: atClock(1, 15),
+        end_ms: atClock(1, 15, 15),
+        all_day: false,
+        source: "reminder",
+        source_id: uuid(),
+        status: "confirmed",
+        location: null,
+        description: null,
+      },
+      {
+        uid: `mtg-${uuid()}`,
+        title: "Design review",
+        start_ms: atClock(2, 14),
+        end_ms: atClock(2, 15),
+        all_day: false,
+        source: "meeting",
+        source_id: uuid(),
+        status: "tentative",
+        location: "Google Meet",
+        description: "Walk through the calendar agenda designs.",
+      },
+      {
+        uid: `mtg-${uuid()}`,
+        title: "1:1 with Priya",
+        start_ms: atClock(4, 13),
+        end_ms: atClock(4, 13, 30),
+        all_day: false,
+        source: "meeting",
+        source_id: uuid(),
+        status: "confirmed",
+        location: null,
+        description: null,
+      },
     ];
   }
 
-  private makeTask(title: string, priority = 0): TaskView {
+  private makeTask(title: string, opts: TaskSeed = {}): TaskView {
     return {
       id: uuid(),
       title,
-      project_id: null,
-      area_id: null,
+      project_id: opts.projectId ?? null,
+      area_id: opts.areaId ?? null,
       notes_md: null,
       status: "open",
-      priority,
-      someday: false,
-      start_on: null,
-      deadline_on: null,
+      priority: opts.priority ?? 0,
+      someday: opts.someday ?? false,
+      start_on: opts.startOn ?? null,
+      deadline_on: opts.deadlineOn ?? null,
       completed_at: null,
       order_key: String(this.tasks.length + 1).padStart(4, "0"),
+    };
+  }
+
+  /** Derived-bucket membership (Feature Specs §3.1) — a query over task fields. */
+  private bucketTasks(bucket: string): TaskView[] {
+    const today = isoDay(0);
+    const open = this.tasks.filter((t) => t.status === "open");
+    const inToday = (t: TaskView): boolean =>
+      !t.someday &&
+      ((t.start_on != null && t.start_on <= today) ||
+        (t.deadline_on != null && t.deadline_on <= today));
+    switch (bucket) {
+      case "Today":
+        return open.filter(inToday);
+      case "Upcoming":
+        return open.filter(
+          (t) =>
+            !t.someday &&
+            !inToday(t) &&
+            ((t.start_on != null && t.start_on > today) ||
+              (t.start_on == null && t.deadline_on != null && t.deadline_on > today)),
+        );
+      case "Anytime":
+        return open.filter((t) => !t.someday && t.start_on == null && t.deadline_on == null);
+      case "Someday":
+        return open.filter((t) => t.someday);
+      default:
+        return [];
+    }
+  }
+
+  private setTaskStatus(taskId: string, status: TaskStatus): TaskView {
+    const t = this.tasks.find((x) => x.id === taskId);
+    if (!t) throw new Error("task not found");
+    t.status = status;
+    t.completed_at = status === "completed" ? this.now() : null;
+    this.emit("TaskChanged", { task_id: t.id });
+    return t;
+  }
+
+  /** Persisted dated tasks projected into all-day agenda events (jump-to-source). */
+  private taskEvents(): AgendaEvent[] {
+    const out: AgendaEvent[] = [];
+    for (const t of this.tasks) {
+      if (t.status !== "open" || t.someday) continue;
+      const day = t.deadline_on ?? t.start_on;
+      if (!day) continue;
+      const start = dayToMs(day);
+      out.push({
+        uid: `task-${t.id}`,
+        title: t.title ?? "Untitled task",
+        start_ms: start,
+        end_ms: start + 24 * 3_600_000,
+        all_day: true,
+        source: "task",
+        source_id: t.id,
+        status: "confirmed",
+        location: null,
+        description: t.deadline_on ? "Deadline" : "Scheduled",
+      });
+    }
+    return out;
+  }
+
+  /** The merged, window-clipped, start-sorted agenda (`calendar.agenda`). */
+  private agenda(fromMs: number, toMs: number): AgendaEvent[] {
+    return [...this.taskEvents(), ...this.extraEvents]
+      .filter((e) => e.start_ms <= toMs && e.end_ms >= fromMs)
+      .sort((a, b) => a.start_ms - b.start_ms);
+  }
+
+  /** A minimal RFC 5545 ICS document for the window (`calendar.export_ics`). */
+  private exportIcs(fromMs: number, toMs: number): string {
+    const two = (n: number): string => String(n).padStart(2, "0");
+    const icsDay = (ms: number): string => {
+      const d = new Date(ms);
+      return `${d.getFullYear()}${two(d.getMonth() + 1)}${two(d.getDate())}`;
+    };
+    const icsUtc = (ms: number): string => {
+      const d = new Date(ms);
+      return (
+        `${d.getUTCFullYear()}${two(d.getUTCMonth() + 1)}${two(d.getUTCDate())}` +
+        `T${two(d.getUTCHours())}${two(d.getUTCMinutes())}${two(d.getUTCSeconds())}Z`
+      );
+    };
+    const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Casual Note//Agenda//EN", "CALSCALE:GREGORIAN"];
+    for (const e of this.agenda(fromMs, toMs)) {
+      lines.push("BEGIN:VEVENT", `UID:${e.uid}`, `SUMMARY:${e.title}`);
+      if (e.all_day) {
+        lines.push(`DTSTART;VALUE=DATE:${icsDay(e.start_ms)}`, `DTEND;VALUE=DATE:${icsDay(e.end_ms)}`);
+      } else {
+        lines.push(`DTSTART:${icsUtc(e.start_ms)}`, `DTEND:${icsUtc(e.end_ms)}`);
+      }
+      lines.push(`STATUS:${e.status.toUpperCase()}`);
+      if (e.location) lines.push(`LOCATION:${e.location}`);
+      if (e.description) lines.push(`DESCRIPTION:${e.description}`);
+      lines.push("END:VEVENT");
+    }
+    lines.push("END:VCALENDAR");
+    return lines.join("\r\n");
+  }
+
+  /** A grounded, evidence-cited `AnswerV1`, or an honest refusal (`ai.ask`). */
+  private ask(query: string): AnswerV1 {
+    const q = query.trim().toLowerCase();
+    const GROUND = [
+      "capture",
+      "search",
+      "roadmap",
+      "meeting",
+      "beta",
+      "latency",
+      "task",
+      "q3",
+      "recall",
+      "friction",
+      "priya",
+      "sam",
+    ];
+    const grounded = q.length > 0 && GROUND.some((k) => q.includes(k));
+    if (!grounded) {
+      return {
+        schema: "AnswerV1",
+        answer: "I don't have enough grounded evidence in your notes to answer that.",
+        citations: [],
+        confidence: 0,
+        unanswered: true,
+      };
+    }
+    const notes = [...this.notes.values()];
+    const roadmap = notes.find((n) => (n.title ?? "").toLowerCase().includes("roadmap")) ?? notes[0];
+    const citations: Citation[] = [];
+    if (roadmap) {
+      citations.push({
+        chunk_id: uuid(),
+        source_kind: "note_block",
+        source_id: roadmap.id,
+        t_start_ms: null,
+        snippet: firstBodyText(roadmap.doc_json) || (roadmap.title ?? ""),
+      });
+    }
+    citations.push({
+      chunk_id: uuid(),
+      source_kind: "transcript_window",
+      source_id: uuid(),
+      t_start_ms: 12_000,
+      snippet: "So the decision is we ship the sub-two-second capture target for the beta.",
+    });
+    return {
+      schema: "AnswerV1",
+      answer:
+        "The Q3 focus is reducing capture friction — the team committed to a sub-two-second " +
+        "quick-capture target for the beta — and improving search recall by fusing vector " +
+        "similarity with the existing FTS index.",
+      citations,
+      confidence: 0.78,
+      unanswered: false,
     };
   }
 
@@ -699,22 +1015,41 @@ class MockCore {
         } satisfies Note;
       }
       case "tasks_bucket":
-        return this.tasks.filter((t) => t.status === "open");
+        return this.bucketTasks(String(args["bucket"]));
       case "tasks_create": {
-        const input = args["input"] as { title: string };
-        const t = this.makeTask(input.title);
+        const input = args["input"] as {
+          title: string;
+          project_id?: string | null;
+          area_id?: string | null;
+          start_on?: string | null;
+          deadline_on?: string | null;
+          someday?: boolean;
+          priority?: number;
+        };
+        const seed: TaskSeed = {};
+        if (input.project_id != null) seed.projectId = input.project_id;
+        if (input.area_id != null) seed.areaId = input.area_id;
+        if (input.start_on != null) seed.startOn = input.start_on;
+        if (input.deadline_on != null) seed.deadlineOn = input.deadline_on;
+        if (input.someday != null) seed.someday = input.someday;
+        if (input.priority != null) seed.priority = input.priority;
+        const t = this.makeTask(input.title, seed);
         this.tasks.push(t);
         this.emit("TaskChanged", { task_id: t.id });
         return t;
       }
-      case "tasks_complete": {
-        const t = this.tasks.find((x) => x.id === String(args["task_id"]));
-        if (!t) throw new Error("task not found");
-        t.status = "done";
-        t.completed_at = this.now();
-        this.emit("TaskChanged", { task_id: t.id });
-        return t;
-      }
+      case "tasks_complete":
+        return this.setTaskStatus(String(args["task_id"]), "completed");
+      case "tasks_set_status":
+        return this.setTaskStatus(String(args["task_id"]), String(args["status"]) as TaskStatus);
+      case "tasks_projects_areas":
+        return { projects: this.projects, areas: this.areas } satisfies ProjectsAreas;
+      case "calendar_agenda":
+        return this.agenda(Number(args["from_ms"]), Number(args["to_ms"]));
+      case "calendar_export_ics":
+        return this.exportIcs(Number(args["from_ms"]), Number(args["to_ms"]));
+      case "ai_ask":
+        return this.ask(String(args["query"]));
       case "capture_quick": {
         const text_ = String(args["text"]);
         const parsed = parse(text_);
@@ -952,7 +1287,7 @@ class MockCore {
 
   private route(parsed: ParsedEntry, raw: string): { kind: string; id: string } {
     if (parsed.kind === "task") {
-      const t = this.makeTask(parsed.title, parsed.priority);
+      const t = this.makeTask(parsed.title, { priority: parsed.priority });
       this.tasks.push(t);
       this.emit("TaskChanged", { task_id: t.id });
       return { kind: "task", id: t.id };

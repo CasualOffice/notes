@@ -21,7 +21,8 @@ use app_service::{
     SessionCoordinator,
 };
 use llm_api::{
-    ConstrainedLlm, GenerationRequest, Grammar, LlmError, MeetingArtifactV1, MockLlm, SchemaValidate,
+    ConstrainedLlm, GenerationRequest, Grammar, LlmError, MeetingArtifactV1, MockLlm,
+    SchemaValidate,
 };
 use rusqlite::OptionalExtension;
 use speech_api::MockSpeechEngine;
@@ -172,11 +173,16 @@ fn full_session_reaches_complete_with_resolvable_evidence_and_task_bridge() {
     assert!(evs
         .iter()
         .any(|e| matches!(e, AppEvent::ArtifactReady { .. })));
-    assert!(evs.iter().any(|e| matches!(e, AppEvent::LiveTranscript { .. })));
+    assert!(evs
+        .iter()
+        .any(|e| matches!(e, AppEvent::LiveTranscript { .. })));
     let reached_complete = evs.iter().any(|e| {
         matches!(
             e,
-            AppEvent::SessionStateChanged { to: SessionState::Complete, .. }
+            AppEvent::SessionStateChanged {
+                to: SessionState::Complete,
+                ..
+            }
         )
     });
     assert!(reached_complete, "SessionStateChanged reached COMPLETE");

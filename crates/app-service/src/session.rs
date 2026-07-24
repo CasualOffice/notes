@@ -37,8 +37,8 @@ use app_domain::{
     Timestamp, TranscriptPass, TranscriptSegment as EventSegment,
 };
 use capture_api::{
-    ApplicationCaptureAdapter, CaptureCapabilities, CaptureConfig, CaptureError, CaptureHandle,
-    CaptureHealth, CapturableApp, PermissionReport, PermissionState, PlatformAppId, SupportLevel,
+    ApplicationCaptureAdapter, CapturableApp, CaptureCapabilities, CaptureConfig, CaptureError,
+    CaptureHandle, CaptureHealth, PermissionReport, PermissionState, PlatformAppId, SupportLevel,
     SystemFallback,
 };
 use llm_api::{
@@ -75,11 +75,17 @@ pub fn legal_transition(from: SessionState, to: SessionState) -> bool {
         (S::New, S::Preflight)
             | (S::Preflight, S::Ready | S::Failed | S::Degraded)
             | (S::Ready, S::Recording | S::Failed | S::Degraded)
-            | (S::Recording, S::Paused | S::Stopping | S::Degraded | S::Failed)
+            | (
+                S::Recording,
+                S::Paused | S::Stopping | S::Degraded | S::Failed
+            )
             | (S::Paused, S::Recording | S::Stopping | S::Failed)
             | (S::Stopping, S::Captured | S::Failed)
             | (S::Captured, S::FinalTranscribing | S::Failed | S::Degraded)
-            | (S::FinalTranscribing, S::Generating | S::Degraded | S::Failed)
+            | (
+                S::FinalTranscribing,
+                S::Generating | S::Degraded | S::Failed
+            )
             | (S::Generating, S::Indexing | S::Degraded | S::Failed)
             | (S::Indexing, S::Complete | S::Degraded | S::Failed)
             | (S::Degraded, S::Recovering | S::Failed)
@@ -255,7 +261,8 @@ impl CannedAudioSource {
             let end = (i + per_block).min(total);
             let mut interleaved = Vec::with_capacity((end - i) * channels as usize);
             for n in i..end {
-                let s = 0.6 * (2.0 * std::f64::consts::PI * freq * n as f64 / f64::from(rate)).sin();
+                let s =
+                    0.6 * (2.0 * std::f64::consts::PI * freq * n as f64 / f64::from(rate)).sin();
                 for _ in 0..channels {
                     interleaved.push(s as f32);
                 }
@@ -536,7 +543,12 @@ impl SessionCoordinator {
 
         // GENERATING → INDEXING → COMPLETE (meeting-as-note + action items + links)
         m.to(SessionState::Indexing, Columns::new(), None)?;
-        let note_id = service.index_meeting(session_id, generated.artifact_id, &generated.artifact, &segs)?;
+        let note_id = service.index_meeting(
+            session_id,
+            generated.artifact_id,
+            &generated.artifact,
+            &segs,
+        )?;
 
         let ended_at = service.now_ms();
         let mut done = Columns::new();
@@ -898,7 +910,8 @@ fn clean_artifact(
         !ev.is_empty()
     };
     a.topics.retain_mut(|t| keep(&mut t.evidence_segment_ids));
-    a.decisions.retain_mut(|d| keep(&mut d.evidence_segment_ids));
+    a.decisions
+        .retain_mut(|d| keep(&mut d.evidence_segment_ids));
     a.action_items
         .retain_mut(|i| !i.task.trim().is_empty() && keep(&mut i.evidence_segment_ids));
     a.risks.retain_mut(|r| keep(&mut r.evidence_segment_ids));
@@ -1311,7 +1324,10 @@ struct ActionItemRow {
     promoted_task_id: Option<String>,
 }
 
-fn read_action_item(conn: &rusqlite::Connection, id: Id) -> rusqlite::Result<Option<ActionItemRow>> {
+fn read_action_item(
+    conn: &rusqlite::Connection,
+    id: Id,
+) -> rusqlite::Result<Option<ActionItemRow>> {
     conn.query_row(
         "SELECT task_text, due_date, evidence_segment_ids, session_id, promoted_task_id \
          FROM action_item WHERE entity_id = ?1",

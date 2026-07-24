@@ -184,6 +184,69 @@ pub struct TaskPatch {
     pub area_id: Option<String>,
 }
 
+/// A `project` row projection (`tasks.projects_areas`). Projects group tasks and
+/// optionally roll up under an [`AreaView`] (Data Model §6).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ProjectView {
+    pub id: String,
+    pub name: Option<String>,
+    pub area_id: Option<String>,
+    pub status: String,
+    pub order_key: String,
+}
+
+/// An `area` row projection (`tasks.projects_areas`). Areas are the top-level
+/// spheres-of-responsibility buckets (Data Model §6).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AreaView {
+    pub id: String,
+    pub name: Option<String>,
+    pub icon: Option<String>,
+    pub order_key: String,
+}
+
+/// `tasks.projects_areas` result — the sidebar's project/area index used to file
+/// and group tasks (Feature Specs §3).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ProjectsAreas {
+    pub projects: Vec<ProjectView>,
+    pub areas: Vec<AreaView>,
+}
+
+// ---------------------------------------------------------------------------
+// Calendar agenda (read-mostly projection — no new storage tables)
+// ---------------------------------------------------------------------------
+
+/// One row of the unified agenda (`calendar.agenda`): a task / reminder / meeting
+/// projected into a calendar event via the `calendar` crate's projection helpers
+/// (calendar §5). Read-mostly — never persisted; re-projected from live pillar
+/// rows on every call.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AgendaEvent {
+    /// Deterministic projected `UID` (`<source>:<uuid>@casual-note`) — stable
+    /// across re-projection, so the UI can dedupe/key on it.
+    pub uid: String,
+    /// Event `SUMMARY`.
+    pub title: String,
+    /// Start instant, absolute UTC epoch-ms.
+    pub start_ms: i64,
+    /// End instant, absolute UTC epoch-ms (exclusive for all-day).
+    pub end_ms: i64,
+    /// Whether this is an all-day (DATE-valued) event.
+    pub all_day: bool,
+    /// Which pillar produced the event: `task` | `reminder` | `meeting`.
+    pub source: String,
+    /// The originating pillar entity id (the task / reminder / session), for the
+    /// jump-to-source affordance.
+    pub source_id: String,
+    /// iCalendar `STATUS` (`confirmed` | `tentative` | `cancelled`).
+    pub status: String,
+    /// `LOCATION`, when present.
+    pub location: Option<String>,
+    /// `DESCRIPTION`, when present.
+    pub description: Option<String>,
+}
+
 // ---------------------------------------------------------------------------
 // Reminders
 // ---------------------------------------------------------------------------

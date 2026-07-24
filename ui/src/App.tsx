@@ -12,15 +12,33 @@
  * app renders for preview.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AskView } from "./features/ai";
 import { Backlinks } from "./features/backlinks";
+import { CalendarView } from "./features/calendar";
 import { Editor } from "./features/editor";
 import { Meetings } from "./features/meetings";
 import { Sidebar } from "./features/notebooks";
 import { QuickCapture } from "./features/quick-capture";
+import { TasksView } from "./features/tasks";
 import { api, isTauri, onAppEvent, type NotebookNode, type NoteSummary } from "./lib/api";
 
-/** The two top-level pillars surfaced in the shell nav. */
-type View = "notes" | "meetings";
+/** The top-level pillars surfaced in the shell nav, and their hash routes. */
+const VIEWS = ["notes", "tasks", "calendar", "meetings", "ask"] as const;
+type View = (typeof VIEWS)[number];
+
+const VIEW_LABEL: Record<View, string> = {
+  notes: "Notes",
+  tasks: "Tasks",
+  calendar: "Calendar",
+  meetings: "Meetings",
+  ask: "Ask",
+};
+
+/** The current view parsed from `location.hash` (defaults to Notes). */
+function viewFromHash(): View {
+  const h = typeof window === "undefined" ? "" : window.location.hash.replace(/^#\/?/, "");
+  return (VIEWS as readonly string[]).includes(h) ? (h as View) : "notes";
+}
 
 const NOTE_EVENTS = new Set(["NoteSaved", "NoteProjected"]);
 const NOTEBOOK_EVENTS = new Set(["NotebooksChanged"]);
@@ -45,7 +63,7 @@ export function App(): React.JSX.Element {
   const [notes, setNotes] = useState<NoteSummary[]>([]);
   const [allNotes, setAllNotes] = useState<NoteSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [view, setView] = useState<View>("notes");
+  const [view, setView] = useState<View>(() => viewFromHash());
   const [error, setError] = useState<string>("");
   const booted = useRef<boolean>(false);
   const notebookRef = useRef<string | null>(null);
@@ -54,6 +72,34 @@ export function App(): React.JSX.Element {
   const select = useCallback((id: string): void => {
     setSelectedId(id);
   }, []);
+
+  // Deep-linking: keep `view` in sync with the URL hash so /#tasks, /#calendar,
+  // /#ask, /#meetings deep-link and Back/Forward navigate between pillars.
+  useEffect(() => {
+    const onHash = (): void => setView(viewFromHash());
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+
+  const goto = useCallback((v: View): void => {
+    setView(v);
+    if (viewFromHash() !== v) window.location.hash = v;
+  }, []);
+
+  const openNote = useCallback(
+    (id: string): void => {
+      goto("notes");
+      setSelectedId(id);
+    },
+    [goto],
+  );
+
+  const openSource = useCallback(
+    (source: "task" | "reminder" | "meeting", _id: string): void => {
+      goto(source === "meeting" ? "meetings" : "tasks");
+    },
+    [goto],
+  );
 
   const refreshNotes = useCallback(async (): Promise<NoteSummary[]> => {
     const nb = notebookRef.current;
@@ -167,25 +213,20 @@ export function App(): React.JSX.Element {
       <header className="topbar">
         <div className="brand">
           <span className="brand-mark">Casual Note</span>
-          <span className="brand-sub">{view === "notes" ? "Notes" : "Meetings"}</span>
+          <span className="brand-sub">{VIEW_LABEL[view]}</span>
         </div>
         <nav className="nav-tabs" aria-label="Pillars">
-          <button
-            type="button"
-            className={`nav-tab${view === "notes" ? " active" : ""}`}
-            aria-current={view === "notes"}
-            onClick={() => setView("notes")}
-          >
-            Notes
-          </button>
-          <button
-            type="button"
-            className={`nav-tab${view === "meetings" ? " active" : ""}`}
-            aria-current={view === "meetings"}
-            onClick={() => setView("meetings")}
-          >
-            Meetings
-          </button>
+          {VIEWS.map((v) => (
+            <button
+              key={v}
+              type="button"
+              className={`nav-tab${view === v ? " active" : ""}`}
+              aria-current={view === v}
+              onClick={() => goto(v)}
+            >
+              {VIEW_LABEL[v]}
+            </button>
+          ))}
         </nav>
         {view === "notes" && (
           <QuickCapture
@@ -206,6 +247,12 @@ export function App(): React.JSX.Element {
 
       {view === "meetings" ? (
         <Meetings />
+      ) : view === "tasks" ? (
+        <TasksView />
+      ) : view === "calendar" ? (
+        <CalendarView onOpenSource={openSource} />
+      ) : view === "ask" ? (
+        <AskView onOpenNote={openNote} />
       ) : (
         <div className="workspace">
         <Sidebar

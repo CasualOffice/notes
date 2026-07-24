@@ -1,4 +1,3 @@
 // feature: tasks
-// Tasks, projects, areas, derived buckets (Data Model §6)
-// Phase-1 placeholder — module wiring lands with its backing HLD §6 commands.
-export {};
+// Tasks, projects, areas, derived buckets (Feature Specs §3, HLD §6).
+export { TasksView } from "./TasksView";

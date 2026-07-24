@@ -18,6 +18,8 @@
 
 #![forbid(unsafe_code)]
 
+pub mod ask;
+pub mod calendar;
 pub mod capture;
 pub mod dto;
 pub mod notebooks;

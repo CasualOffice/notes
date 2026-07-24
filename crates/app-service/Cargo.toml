@@ -21,6 +21,13 @@ tasks = { path = "../tasks" }
 reminders = { path = "../reminders" }
 search = { path = "../search" }
 app-nlp = { path = "../app-nlp" }
+# Read-mostly unified agenda: project persisted tasks/reminders/meetings into
+# CalendarEvents (calendar §5). No new storage tables — projection only.
+calendar = { path = "../calendar" }
+# Grounded "Ask your notes" pipeline (HLD §8.5) + its offline retrieval substrate.
+# Runs over MockLlm (llm-api) + MockEmbedder (embeddings) with the network disabled.
+ai-workspace = { path = "../ai-workspace" }
+embeddings = { path = "../embeddings" }
 # Phase-2 engine contracts (traits + DTOs) + the pure DSP pipeline. The session
 # coordinator composes these behind their trait seams; the real whisper.cpp /
 # llama.cpp / OS-capture backends plug into the same traits in a later pass.
